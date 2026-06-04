@@ -1,0 +1,624 @@
+.hidden-on-start {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.8s cubic-bezier(0.4,0,0.2,1);
+}
+.show-after-sound {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+.sound-btn {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 200;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 1.5s cubic-bezier(0.4,0,0.2,1);
+}
+
+.sound-btn svg {
+  transition: 0.5s cubic-bezier(0.4,0,0.2,1);
+}
+.sound-btn:hover svg {
+  transform: scale(1.3);
+}
+.sound-btn.visible {
+  opacity: 1;
+}
+.sound-descr {
+  color: #fff;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 200;
+  margin-top: 120px;
+  opacity: 0;
+  transition: opacity 1.5s cubic-bezier(0.4,0,0.2,1);
+}
+.sound-btn.visible ~ .sound-descr {
+  opacity: 1;
+}
+
+section#main-section {
+  opacity: 1;
+  transition: none;
+}
+
+section#main-section > :not(.svg-background) {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 3s cubic-bezier(0.4,0,0.2,1);
+}
+section#main-section.visible > :not(.svg-background),
+section#main-section > .show-after-sound {
+  /* opacity: 1 !important; */
+  pointer-events: none;
+  z-index: 1;
+}
+canvas {
+  background: transparent !important;
+  display: block;
+}
+ @font-face {
+  font-family: 'Comforter';
+  src: url('../fonts/Comforter/Comforter-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Avenir_Next_W1G_Medium';
+  src: url('../fonts/Аvеnіr_Nехt_W1G/Avenir_Next_W1G_Medium.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Avenir_Next_W1G_UltraLight';
+  src: url('../fonts/Аvеnіr_Nехt_W1G/Avenir_Next_W1G_UltraLight.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  user-select: none;
+}
+
+body {
+  background-color: #121315;
+  font-family: 'Avenir_Next_W1G_Medium';
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+}
+
+button{
+  background-color: transparent;
+  border: unset;
+  cursor: pointer !important;
+  padding: 0;
+  outline: none;
+}
+
+.container{
+  padding: 0 40px;
+}
+
+section#main-section {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  display: block;
+}
+
+section.loading {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 9999;
+  opacity: 1;
+  transition: opacity 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+}
+section.loading.hide {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.carousel {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  perspective: 1200px;
+  opacity: 0;
+  transition: opacity 0.8s ease-out;
+}
+.carousel.visible {
+  opacity: 1 !important;
+}
+
+.carousel-track {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+}
+
+.slide {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 28vw;
+  height: 100vh;
+  transform-style: preserve-3d;
+  transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  background: transparent;
+  overflow: visible;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  will-change: transform;
+  opacity: 0;
+}
+
+.slide.left {
+  transform: translateX(calc(-50% - 35vw)) translateZ(-120px) scale(0.8);
+  opacity: 0;
+  z-index: 10;
+}
+
+.slide.center {
+  transform: translateX(-50%) translateZ(0) scale(1);
+  opacity: 0;
+  z-index: 30;
+  cursor: unset;
+  width: 28vw;
+  height: 100vh;
+}
+
+/* When we need the center slide to expand to fullscreen (explicit class), use this */
+.slide.center.fullscreen {
+  left: 50%;
+  top: 0;
+  width: 100vw;
+  height: 100vh;
+  transform: translateX(-50%) translateZ(0) scale(1);
+}
+.slide.center.visible {
+  opacity: 1 !important;
+}
+
+.slide.right {
+  transform: translateX(calc(-50% + 35vw)) translateZ(-120px) scale(0.8);
+  opacity: 0;
+  z-index: 10;
+}
+
+.slide.left.visible, .slide.right.visible {
+  opacity: 0.5 !important;
+}
+
+.slide canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: auto;
+  outline: none;
+  background: transparent;
+}
+
+
+.svg-background {
+  opacity: 0;
+  transition: opacity 0.8s cubic-bezier(0.4,0,0.2,1);
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  width: min(33.96vw, 75vh);
+  height: auto;
+  filter: drop-shadow(0 0 15px rgba(0, 0, 0, 0.3));
+}
+.svg-rotate-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.8s cubic-bezier(0.4,0,0.2,1);
+  transform: scale(1);
+}
+.svg-background.scale-full .svg-rotate-wrapper {
+  transform: scale(1);
+}
+.svg-background .svg-rotate-wrapper {
+  transform: scale(0.4);
+}
+.svg-background.scale-full .svg-rotate-wrapper {
+  transform: scale(1);
+}
+.svg-background svg {
+  width: 100%;
+  height: auto;
+  animation: rotateSvg 25s linear infinite;
+}
+.svg-background.visible {
+  opacity: 1;
+}
+
+.svg-background svg {
+  width: 100%;
+  height: auto;
+  animation: rotateSvg 25s linear infinite;
+  transform: scale(0.4);
+  transition: transform 0.8s cubic-bezier(0.4,0,0.2,1);
+}
+.svg-background.scale-full svg {
+  transform: scale(1);
+}
+
+@keyframes rotateSvg {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.svg-background svg path,
+.svg-background svg circle {
+  transition:
+    stroke 0.55s cubic-bezier(0.4, 0, 0.2, 1),
+    stroke-opacity 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.text-overlay {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 100;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  perspective: 800px;
+}
+
+.word-slide {
+  position: absolute;
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  align-items: center;
+  white-space: nowrap;
+  transform-style: preserve-3d;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.word-slide.active {
+  opacity: 1;
+}
+
+.letter {
+  display: inline-block;
+  font-size: calc(15.625vw);
+  font-weight: 400;
+  font-family: 'Comforter', sans-serif;
+  line-height: 1.2;
+  transform-style: preserve-3d;
+  will-change: transform, opacity;
+  color: white;
+  text-shadow: 0 2px 20px rgba(0, 0, 0, 0.5);
+}
+
+@keyframes flipLetterOut {
+  0% {
+    transform: rotateX(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: rotateX(90deg);
+    opacity: 0;
+  }
+}
+
+@keyframes flipLetterIn {
+  0% {
+    transform: rotateX(90deg);
+    opacity: 0;
+  }
+  100% {
+    transform: rotateX(0deg);
+    opacity: 1;
+  }
+}
+
+.controls-wrapper {
+  position: fixed;
+  bottom: 40%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: none;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 100;
+  max-width: 1120px !important;
+  width: 100%;
+  pointer-events: none !important;
+}
+
+.dots {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  background: rgba(18, 19, 21, 0.5);
+  backdrop-filter: blur(8px);
+  padding: 10px 24px;
+  border-radius: 60px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  display: none;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.4);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+  border: none;
+  padding: 0;
+}
+
+.dot.active {
+  background: white;
+  width: 28px;
+  border-radius: 8px;
+  box-shadow: 0 0 8px rgba(255, 215, 0, 0.5);
+}
+
+.controls-wrapper.visible {
+  display: flex !important;
+  opacity: 1;
+  pointer-events: auto !important;
+}
+
+.nav-arrow {
+  width: 52px;
+  height: 52px;
+  backdrop-filter: blur(12px);
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.2);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  width: 200px;
+  height: 200px;
+  opacity: 0;
+  pointer-events: all;
+}
+
+.nav-arrow:hover {
+  transform: scale(1.08);
+}
+
+.nav-arrow:active {
+  transform: scale(0.96);
+}
+
+.nav-arrow i-lucide {
+  width: 28px;
+  height: 28px;
+  stroke-width: 1.8;
+  transition: transform 0.2s;
+}
+
+.nav-arrow:hover i-lucide {
+  transform: scale(1.05);
+}
+
+.header {
+  position: fixed;
+  top: 34px;
+  width: 100%;
+  display: block;
+  opacity: 0;
+  transform: translateY(-8px);
+  visibility: hidden;
+  transition: opacity 0.6s ease-out, transform 0.6s ease-out, visibility 0s linear 0.6s;
+  z-index: 999 !important;
+  pointer-events: none;
+}
+
+.header.visible{
+  opacity: 1 !important;
+  transform: translateY(0) !important;
+  visibility: visible !important;
+  transition-delay: 0s;
+  pointer-events: auto !important;
+}
+
+.header__content{
+  display: flex;
+  justify-content: space-between;
+}
+
+.header p{
+  color: white;
+}
+
+.header__button{
+  display: flex;
+  align-items: center;
+  width: 121px;
+  justify-content: space-between;
+}
+.header__button path{
+  transition: all 0.6s ease-out;
+}
+.header__button:hover path{
+  fill-opacity: 1;
+}
+
+.choise-button {
+  /* keep element out of sight but renderable so we can animate opacity/transform */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: white;
+  font-size: 12px;
+  text-transform: uppercase;
+  position: absolute;
+  bottom: 50px;
+  left: 50%;
+  width: auto;
+  transform: translateX(-50%) translateY(8px);
+  transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+  pointer-events: none;
+  z-index: 100;
+  opacity: 0;
+  visibility: hidden;
+}
+
+.choise-button.visible {
+  display: flex !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  transform: translateX(-50%) translateY(0);
+}
+
+.choise-button__brackets {
+    width: 91px;
+    display: flex;
+    justify-content: space-between;
+    transition: transform 0.4s ease-out;
+}
+
+.choise-button:hover .choise-button__brackets {
+    transform: rotate(180deg);
+}
+
+.choise-button__text {
+    position: absolute;
+    opacity: 1;
+    transition: opacity 0.4s ease-out;
+}
+
+.choise-button:hover .choise-button__text {
+    opacity: 0;
+}
+
+.choise-button__brand {
+    opacity: 0;
+    position: absolute;
+    transition: opacity 0.4s ease-out;
+}
+
+/* Fade-out utility used when user confirms choice */
+.fade-out {
+  opacity: 0 !important;
+  will-change: opacity;
+  transition: opacity 1.6s cubic-bezier(0.4,0,0.2,1) !important;
+  pointer-events: none !important;
+}
+
+.choise-button:hover .choise-button__brand {
+    opacity: 1;
+}
+
+@media (max-width: 1400px) {
+  .letter {
+    font-size: 200px;
+  }
+}
+@media (max-width: 1000px) {
+  .letter {
+    font-size: 130px;
+  }
+}
+@media (max-width: 700px) {
+}
+
+@media (max-width: 700px) {
+  .letter {
+    font-size: 80px;
+  }
+  .word-slide {
+    white-space: normal;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .svg-background {
+    width: min(70vw, 70vh);
+  }
+  .slide {
+    width: 40vw;
+  }
+  .slide.left {
+    transform: translateX(calc(-50% - 22vw)) translateZ(-80px) scale(0.75);
+  }
+  .slide.right {
+    transform: translateX(calc(-50% + 22vw)) translateZ(-80px) scale(0.75);
+  }
+
+  .nav-arrow {
+    width: 44px;
+    height: 44px;
+  }
+  .nav-arrow i-lucide {
+    width: 22px;
+    height: 22px;
+  }
+  .controls-wrapper {
+    bottom: 20px;
+    gap: 20px;
+  }
+  .dots {
+    padding: 6px 18px;
+    gap: 10px;
+  }
+}
+
+@media (max-width: 500px) {
+  .letter {
+    font-size: 55px;
+  }
+  .slide {
+    width: 50vw;
+  }
+}
+
+/* Ensure scroll-section appears by fading only (no slide/translate) */
+.scroll-section {
+  opacity: 0 !important;
+  pointer-events: none;
+  transform: none !important;
+  transition: opacity 360ms cubic-bezier(0.2,0,0.1,1);
+}
+.scroll-section.visible {
+  opacity: 1 !important;
+  pointer-events: auto;
+  transform: none !important;
+}

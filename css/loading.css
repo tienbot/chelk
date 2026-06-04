@@ -1,0 +1,235 @@
+
+.loading::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: #121315;
+  opacity: 1;
+  transition: opacity 0.8s cubic-bezier(0.4,0,0.2,1);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.loading.hide::before {
+  opacity: 0;
+}
+.loading{
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 9999;
+  background: #121315;
+  opacity: 1;
+  transition: opacity 0.8s cubic-bezier(0.4,0,0.2,1), visibility 0.8s cubic-bezier(0.4,0,0.2,1);
+  pointer-events: all;
+  overflow: hidden;
+}
+.loading.hide {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.loading__wrapper{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100dvh;
+  position: relative;
+  z-index: 1;
+}
+
+.loading__brand{
+  color: #fff;
+  text-transform: uppercase;
+  text-align: center;
+  font-size: 150px;
+  display: flex;
+  justify-content: center;
+  align-content: center;
+  align-items: center;
+  margin: 0 20px;
+}
+
+.loading__line{
+  height: 1px;
+  background-color: #fff;
+  opacity: 30%;
+  margin-top: 26px;
+  transition: width 1s ease-out;
+  animation: expandLine 1s ease-out forwards;
+}
+.loading__line.right{
+  margin-right: 20px;
+}
+.loading__line.left{
+  margin-left: 20px;
+}
+
+@keyframes expandLine {
+  0% {
+    width: 0%;
+  }
+  100% {
+    width: 40%;
+  }
+}
+
+.loading__line.compress {
+    animation: compressLine 1s ease-out forwards;
+}
+
+@keyframes compressLine {
+  0% {
+    width: 40%;
+  }
+  100% {
+    width: 0%;
+  }
+}
+
+.loading__small-text{
+  margin-top: 26px;
+  color: #fff;
+  opacity: 0;
+  font-size: 16px;
+  animation: fadeInText 0.5s forwards;
+  animation-delay: 0.7s;
+}
+
+@keyframes fadeInText {
+  0% {
+    opacity: 0;
+    clip-path: inset(0 0 100% 0);
+  }
+  100% {
+    opacity: 0.3;
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+.loading__small-text.left {
+  transition: transform 0.5s ease-out, opacity 0.5s ease-out;
+}
+
+.loading__small-text.right {
+  transition: transform 0.5s ease-out, opacity 0.5s ease-out;
+}
+
+.loading__small-text.left.slide-out-left {
+  transform: translateX(-200%);
+  opacity: 0;
+  transition-delay: 0.6s;
+}
+
+.loading__small-text.right.slide-out-right {
+  transform: translateX(200%);
+  opacity: 0;
+  transition-delay: 0.6s;
+}
+
+
+
+
+.loading__counter {
+  font-size: 32px;
+  color: #fff;
+  display: inline-block;
+  overflow: hidden;
+  position: absolute;
+  bottom: 50px;
+  font-family: 'Avenir_Next_W1G_UltraLight';
+  letter-spacing: -3%;
+  line-height: 140%;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.counter-container {
+  display: flex;
+  position: relative;
+  height: 60px;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  overflow: hidden;
+}
+.digit {
+  position: relative;
+  width: 20px;
+  height: 60px;
+  overflow: hidden;
+  text-align: right;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  color: #fff;
+  font-family: 'Avenir_Next_W1G_UltraLight';
+  user-select: none;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  clip-path: inset(0 0 0 0);
+}
+.digit-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  clip-path: inset(0 0 0 0);
+}
+.digit-old, .digit-new {
+  position: absolute;
+  width: 100%;
+  left: 0;
+  text-align: center;
+  font-size: 32px;
+  color: #fff;
+  font-family: 'Avenir Next', 'Comforter', sans-serif;
+  line-height: 1.1;
+  height: 100%;
+  transition: transform 0.15s ease-out;
+  background: transparent;
+  clip-path: inset(0 0 0 0);
+}
+.digit-old {
+  top: 0;
+  transform: translateY(0);
+  z-index: 1;
+}
+.digit-new {
+  top: 100%;
+  transform: translateY(0);
+  z-index: 2;
+  animation: slideUp 0.15s ease-out forwards;
+}
+@keyframes slideUp {
+  0% {
+    top: 100%;
+    transform: translateY(0);
+  }
+  100% {
+    top: 0;
+    transform: translateY(-100%);
+  }
+}
+
+
+
+
+@media (max-width: 1440px) {
+  .container{
+    padding: 0 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .container{
+    padding: 0 10px;
+  }
+}
