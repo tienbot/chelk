@@ -37,6 +37,9 @@ function updateMainObjectText(text) {
     if (el) {
       el.textContent = text;
     }
+    // keep module-level and global copies in sync so other scripts can read the active value
+    try { mainObject = text; } catch (e) {}
+    try { if (typeof window !== 'undefined') window.mainObject = text; } catch (e) {}
     console.log('mainObject:', text);
       try {
         window.dispatchEvent(new CustomEvent('mainObjectChange', { detail: text }));
@@ -482,10 +485,17 @@ function enhanceMaterials(model) {
 // ========== 3D МОДЕЛИ ==========
 function applyCameraSettings(instance) {
   if (!instance) return;
+  // If we have a base bounding radius for the instance, place the camera so the model fits
+  const baseRadius = instance.baseBoundingRadius || 0;
+  let dist = CAMERA_SETTINGS.position.z;
+  if (baseRadius > 0) {
+    // factor tuned to provide comfortable framing for most models
+    dist = Math.max(dist, baseRadius * 2.8 + 0.8);
+  }
   instance.camera.position.set(
     CAMERA_SETTINGS.position.x,
     CAMERA_SETTINGS.position.y,
-    CAMERA_SETTINGS.position.z,
+    dist,
   );
   instance.controls.target.set(
     CAMERA_SETTINGS.target.x,
@@ -493,6 +503,47 @@ function applyCameraSettings(instance) {
     CAMERA_SETTINGS.target.z,
   );
   instance.controls.update();
+}
+
+// Stabilize a single instance as if the carousel had shifted it (resizes renderer,
+// recomputes bbox and reapplies uniform scale) but WITHOUT changing classes or colors.
+async function stabilizeInstanceAsIfShifted(inst, slideIndex) {
+  if (!inst || !inst.modelGroup || !inst.slideElement) return;
+  try {
+    if (inst.updateRendererSizeToCanvas) inst.updateRendererSizeToCanvas();
+    const usedDpr = Math.min(window.devicePixelRatio || 1, 2);
+    try { inst.renderer.setPixelRatio(usedDpr); } catch (e) {}
+    const cw = Math.max(1, Math.floor(inst.slideElement.clientWidth || 1));
+    const ch = Math.max(1, Math.floor(inst.slideElement.clientHeight || 1));
+    try { inst.renderer.setSize(cw, ch, false); } catch (e) {}
+    try { if (inst.camera) { inst.camera.aspect = cw / ch; inst.camera.updateProjectionMatrix(); } } catch (e) {}
+
+    // allow layout to settle
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+    const wrapper = inst.modelGroup;
+    try { if (typeof wrapper.updateWorldMatrix === 'function') wrapper.updateWorldMatrix(true, true); } catch (e) {}
+    try {
+      const box = new THREE.Box3().setFromObject(wrapper);
+      const size = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x || 1e-6, size.y || 1e-6, size.z || 1e-6);
+      const DESIRED_NORMALIZED = 0.6;
+      let finalAutoScale = (inst.modelConfig.scale || 1) * (DESIRED_NORMALIZED / maxDim);
+      try {
+        const base = inst.modelConfig.scale || 1;
+        const minRel = base * 0.4;
+        const maxRel = base * 2.2;
+        finalAutoScale = clamp(finalAutoScale, minRel, maxRel);
+        finalAutoScale = clamp(finalAutoScale, MIN_MODEL_SCALE, MAX_MODEL_SCALE);
+      } catch (e) { finalAutoScale = clamp(finalAutoScale, MIN_MODEL_SCALE, MAX_MODEL_SCALE); }
+      wrapper.scale.set(finalAutoScale, finalAutoScale, finalAutoScale);
+      try { const sph = new THREE.Sphere(); box.getBoundingSphere(sph); if (threeInstances[slideIndex]) threeInstances[slideIndex].baseBoundingRadius = sph.radius * (finalAutoScale || 1); } catch (e) {}
+      updateModelScale(inst, slideIndex === currentSlideIndex, inst.modelConfig);
+      applyCameraSettings(inst);
+      try { inst.renderer.render(inst.scene, inst.camera); } catch (e) {}
+      console.log(`[slide ${slideIndex}] stabilized as-if-shifted finalAutoScale=${finalAutoScale.toFixed(4)}`);
+    } catch (e) {}
+  } catch (e) {}
 }
 
 function updateModelScale(instance, isActive, modelConfig) {
@@ -536,30 +587,76 @@ async function loadModelIntoSlide(slideIndex, modelConfig) {
 
     // Wrap model in a parent group so scaling happens around a stable origin
     const wrapper = new THREE.Group();
-    // Reset model local scale and use wrapper scale for sizing
-    model.scale.set(1, 1, 1);
+
+    wrapper.add(model);
+
+    // If any mesh nodes have non-uniform local scales, bake those scales into their geometry
+    // to avoid hierarchical scale distortion while preserving rotations/translations.
+    function bakeNodeScales(root) {
+      root.traverse((child) => {
+        if (child.isMesh && child.geometry) {
+          const s = child.scale;
+          if (!s) return;
+          if (Math.abs(s.x - 1) > 1e-6 || Math.abs(s.y - 1) > 1e-6 || Math.abs(s.z - 1) > 1e-6) {
+            const m = new THREE.Matrix4().makeScale(s.x, s.y, s.z);
+            try {
+              child.geometry.applyMatrix4(m);
+              child.scale.set(1, 1, 1);
+              if (child.geometry.attributes.normal) child.geometry.computeVertexNormals();
+              if (child.geometry.computeBoundingBox) child.geometry.computeBoundingBox();
+              if (child.geometry.computeBoundingSphere) child.geometry.computeBoundingSphere();
+            } catch (e) {
+              // ignore failures on exotic geometries
+            }
+          }
+        }
+      });
+    }
+
+    try { bakeNodeScales(model); } catch (e) {}
 
     // Compute bounding box on the raw model, then center the model inside the wrapper
     const box = new THREE.Box3().setFromObject(model);
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
     console.log(`[slide ${slideIndex}] model bbox size:`, size, 'center:', center);
+    // Center the wrapper by offsetting the model (geometry baked into children)
     model.position.x = -center.x;
-    model.position.z = -center.z;
     model.position.y = -center.y;
+    model.position.z = -center.z;
 
       // compute bounding sphere radius (base, unscaled) and store on instance for camera-edge limits
+      let baseSphereRadius = 0;
       try {
         const sphere = new THREE.Sphere();
         box.getBoundingSphere(sphere);
-        if (threeInstances[slideIndex]) {
-          threeInstances[slideIndex].baseBoundingRadius = sphere.radius;
-        }
+        baseSphereRadius = sphere.radius || 0;
       } catch (e) {}
 
-    // Apply initial scale on wrapper so further scale changes keep model centered
-    wrapper.add(model);
-    wrapper.scale.set(modelConfig.scale, modelConfig.scale, modelConfig.scale);
+      // Apply initial scale on wrapper so further scale changes keep model centered
+      // wrapper already contains model
+
+      // Auto-normalize large or tiny models to fit a reasonable viewport fraction.
+      try {
+        const maxDim = Math.max(size.x || 1e-6, size.y || 1e-6, size.z || 1e-6);
+        const DESIRED_NORMALIZED = 0.6; // target size in world units relative to scale baseline
+        let autoScale = (modelConfig.scale || 1) * (DESIRED_NORMALIZED / maxDim);
+        // clamp relative to original modelConfig.scale to avoid huge jumps for tiny models
+        try {
+          const base = modelConfig.scale || 1;
+          const minRel = base * 0.4;
+          const maxRel = base * 2.2;
+          autoScale = clamp(autoScale, minRel, maxRel);
+          autoScale = clamp(autoScale, MIN_MODEL_SCALE, MAX_MODEL_SCALE);
+        } catch (e) {}
+        wrapper.scale.set(autoScale, autoScale, autoScale);
+        // update stored base bounding radius to reflect applied wrapper scale
+        if (threeInstances[slideIndex]) threeInstances[slideIndex].baseBoundingRadius = baseSphereRadius * (autoScale || 1);
+        console.log(`[slide ${slideIndex}] applied autoScale=${autoScale.toFixed(4)} (maxDim=${maxDim.toFixed(4)})`);
+      } catch (e) {
+        wrapper.scale.set(modelConfig.scale, modelConfig.scale, modelConfig.scale);
+        if (threeInstances[slideIndex]) threeInstances[slideIndex].baseBoundingRadius = baseSphereRadius * (modelConfig.scale || 1);
+      }
 
     inst.scene.add(wrapper);
     inst.modelGroup = wrapper;
@@ -567,8 +664,149 @@ async function loadModelIntoSlide(slideIndex, modelConfig) {
     try {
       if (inst.updateRendererSizeToCanvas) inst.updateRendererSizeToCanvas();
     } catch (e) {}
+
+    // Wait two frames to ensure layout/renderer stabilized (fixes DevTools-dependent race).
+    try {
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      // Recompute bbox from the wrapper (after any world updates) and reapply a stable autoScale
+      try {
+        if (typeof wrapper.updateWorldMatrix === 'function') wrapper.updateWorldMatrix(true, true);
+        const finalBox = new THREE.Box3().setFromObject(wrapper);
+        const finalSize = finalBox.getSize(new THREE.Vector3());
+        const finalMaxDim = Math.max(finalSize.x || 1e-6, finalSize.y || 1e-6, finalSize.z || 1e-6);
+        const DESIRED_NORMALIZED = 0.6;
+        let finalAutoScale = (modelConfig.scale || 1) * (DESIRED_NORMALIZED / finalMaxDim);
+        try {
+          const base = modelConfig.scale || 1;
+          const minRel = base * 0.4;
+          const maxRel = base * 2.2;
+          finalAutoScale = clamp(finalAutoScale, minRel, maxRel);
+          finalAutoScale = clamp(finalAutoScale, MIN_MODEL_SCALE, MAX_MODEL_SCALE);
+        } catch (e) { finalAutoScale = clamp(finalAutoScale, MIN_MODEL_SCALE, MAX_MODEL_SCALE); }
+        wrapper.scale.set(finalAutoScale, finalAutoScale, finalAutoScale);
+        // update stored base bounding radius to reflect applied wrapper scale
+        try {
+          const sphere = new THREE.Sphere();
+          finalBox.getBoundingSphere(sphere);
+          if (threeInstances[slideIndex]) threeInstances[slideIndex].baseBoundingRadius = sphere.radius * (finalAutoScale || 1);
+        } catch (e) {}
+        console.log(`[slide ${slideIndex}] re-applied finalAutoScale=${finalAutoScale.toFixed(4)} (finalMaxDim=${finalMaxDim.toFixed(4)})`);
+      } catch (e) {}
+    } catch (e) {}
+
     updateModelScale(inst, slideIndex === currentSlideIndex, modelConfig);
+    // make sure camera aspect matches the slide's client size after stabilization
+    try {
+      const slEl = inst && inst.slideElement ? inst.slideElement : null;
+      const cw = Math.max(1, Math.floor((slEl && slEl.clientWidth) || 0));
+      const ch = Math.max(1, Math.floor((slEl && slEl.clientHeight) || 0));
+      if (inst.camera && cw > 0 && ch > 0) {
+        inst.camera.aspect = cw / ch;
+        inst.camera.updateProjectionMatrix();
+      }
+    } catch (e) {}
     applyCameraSettings(inst);
+    try {
+      // Ensure world matrices are updated so bounding calculations are correct
+      if (model && typeof model.updateWorldMatrix === 'function') model.updateWorldMatrix(true, true);
+      const ws = new THREE.Vector3();
+      try { model.getWorldScale(ws); } catch (e) { ws.set(1,1,1); }
+      console.log(`[slide ${slideIndex}] model worldScale=${ws.toArray().map(v=>v.toFixed(4))}`);
+      console.log(`[slide ${slideIndex}] camera pos ${JSON.stringify(inst.camera.position.toArray())} target ${JSON.stringify(inst.controls.target.toArray())} aspect=${inst.camera.aspect}`);
+    } catch (e) {}
+
+    // Poll briefly for devicePixelRatio changes (opening/closing DevTools can change DPR)
+    try {
+      const start = performance.now();
+      let lastDpr = Math.min(window.devicePixelRatio || 1, 2);
+      const pollInterval = 100; // ms
+      const maxDuration = 1200; // ms
+      const pollId = setInterval(() => {
+        try {
+          const now = performance.now();
+          const curDpr = Math.min(window.devicePixelRatio || 1, 2);
+          if (curDpr !== lastDpr) {
+            lastDpr = curDpr;
+            // update renderer pixelRatio and sizes
+            try {
+              const usedDpr = curDpr;
+              inst.renderer.setPixelRatio(usedDpr);
+              const slEl = inst && inst.slideElement ? inst.slideElement : null;
+              const displayW = Math.max(1, Math.floor((slEl && slEl.clientWidth) || 1));
+              const displayH = Math.max(1, Math.floor((slEl && slEl.clientHeight) || 1));
+              inst.renderer.setSize(displayW, displayH, false);
+              if (inst.camera) {
+                inst.camera.aspect = displayW / displayH;
+                inst.camera.updateProjectionMatrix();
+              }
+              // recompute bbox and reapply scale
+              try {
+                if (typeof wrapper.updateWorldMatrix === 'function') wrapper.updateWorldMatrix(true, true);
+                const finalBox2 = new THREE.Box3().setFromObject(wrapper);
+                const finalSize2 = finalBox2.getSize(new THREE.Vector3());
+                const finalMaxDim2 = Math.max(finalSize2.x || 1e-6, finalSize2.y || 1e-6, finalSize2.z || 1e-6);
+                const DESIRED_NORMALIZED = 0.6;
+                let finalAutoScale2 = (modelConfig.scale || 1) * (DESIRED_NORMALIZED / finalMaxDim2);
+                try {
+                  const base = modelConfig.scale || 1;
+                  const minRel = base * 0.4;
+                  const maxRel = base * 2.2;
+                  finalAutoScale2 = clamp(finalAutoScale2, minRel, maxRel);
+                  finalAutoScale2 = clamp(finalAutoScale2, MIN_MODEL_SCALE, MAX_MODEL_SCALE);
+                } catch (e) { finalAutoScale2 = clamp(finalAutoScale2, MIN_MODEL_SCALE, MAX_MODEL_SCALE); }
+                wrapper.scale.set(finalAutoScale2, finalAutoScale2, finalAutoScale2);
+                try { const sph = new THREE.Sphere(); finalBox2.getBoundingSphere(sph); if (threeInstances[slideIndex]) threeInstances[slideIndex].baseBoundingRadius = sph.radius * (finalAutoScale2 || 1); } catch (e) {}
+                console.log(`[slide ${slideIndex}] DPR change handled: set pixelRatio=${usedDpr}, finalAutoScale=${finalAutoScale2.toFixed(4)}`);
+              } catch (e) {}
+            } catch (e) {}
+          }
+          if (now - start > maxDuration) clearInterval(pollId);
+        } catch (e) {
+          try { clearInterval(pollId); } catch (e2) {}
+        }
+      }, pollInterval);
+    } catch (e) {}
+
+    // Final stabilization: re-sync renderer size and recompute a stable auto-scale once layout/DPR settled.
+    try {
+      setTimeout(async () => {
+        try {
+          if (inst && inst.updateRendererSizeToCanvas) inst.updateRendererSizeToCanvas();
+          // wait two frames to ensure any layout changes applied
+          await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+          if (typeof wrapper.updateWorldMatrix === 'function') wrapper.updateWorldMatrix(true, true);
+          const stableBox = new THREE.Box3().setFromObject(wrapper);
+          const stableSize = stableBox.getSize(new THREE.Vector3());
+          const stableMaxDim = Math.max(stableSize.x || 1e-6, stableSize.y || 1e-6, stableSize.z || 1e-6);
+          const DESIRED_NORMALIZED = 0.6;
+          let stableAutoScale = (modelConfig.scale || 1) * (DESIRED_NORMALIZED / stableMaxDim);
+          try {
+            const base = modelConfig.scale || 1;
+            const minRel = base * 0.4;
+            const maxRel = base * 2.2;
+            stableAutoScale = clamp(stableAutoScale, minRel, maxRel);
+            stableAutoScale = clamp(stableAutoScale, MIN_MODEL_SCALE, MAX_MODEL_SCALE);
+          } catch (e) { stableAutoScale = clamp(stableAutoScale, MIN_MODEL_SCALE, MAX_MODEL_SCALE); }
+          wrapper.scale.set(stableAutoScale, stableAutoScale, stableAutoScale);
+          try {
+            const sph = new THREE.Sphere();
+            stableBox.getBoundingSphere(sph);
+            if (threeInstances[slideIndex]) threeInstances[slideIndex].baseBoundingRadius = sph.radius * (stableAutoScale || 1);
+          } catch (e) {}
+          if (inst && inst.camera && inst.slideElement) {
+            try {
+              const cw = Math.max(1, Math.floor(inst.slideElement.clientWidth || 1));
+              const ch = Math.max(1, Math.floor(inst.slideElement.clientHeight || 1));
+              inst.camera.aspect = cw / ch;
+              inst.camera.updateProjectionMatrix();
+            } catch (e) {}
+          }
+          console.log(`[slide ${slideIndex}] final stabilization applied stableAutoScale=${stableAutoScale.toFixed(4)}`);
+        } catch (e) {}
+      }, 160);
+    } catch (e) {}
+
+    // No debug markers in production build.
     console.log(`✅ Модель "${modelConfig.name}" успешно загружена с улучшенным освещением`);
   } catch (err) {
     console.error(`❌ Ошибка загрузки модели "${modelConfig.name}":`, err);
@@ -583,6 +821,27 @@ async function loadModelIntoSlide(slideIndex, modelConfig) {
 }
 
 async function initThreeForSlide(slideElement, modelConfig, slideIndex) {
+  // Ensure the slide has non-zero layout size before creating canvas/renderer.
+  // Sometimes the element is still hidden/0-sized (transitions), which leads to canvases with 0x0
+  // and invisible renderers. Wait a short time for layout to stabilize.
+  async function waitForNonZeroSize(el, timeout = 1600) {
+    const start = performance.now();
+    return new Promise((resolve) => {
+      function check() {
+        try {
+          const r = el.getBoundingClientRect();
+          if ((r.width >= 8 && r.height >= 8) || (performance.now() - start) > timeout) return resolve(true);
+        } catch (e) {
+          // ignore
+        }
+        requestAnimationFrame(check);
+      }
+      check();
+    });
+  }
+
+  await waitForNonZeroSize(slideElement);
+
   const canvas = document.createElement('canvas');
   // Возвращаем прозрачный фон canvas
   // Сделаем canvas позиционированным и используем CSS cover-подход,
@@ -596,29 +855,43 @@ async function initThreeForSlide(slideElement, modelConfig, slideIndex) {
   slideElement.style.overflow = 'hidden';
   canvas.style.cssText = '';
   canvas.style.position = 'absolute';
-  canvas.style.top = '50%';
-  canvas.style.left = '50%';
-  canvas.style.transform = 'translate(-50%, -50%)';
-  canvas.style.minWidth = '100%';
-  canvas.style.minHeight = '100%';
-  canvas.style.width = 'auto';
-  canvas.style.height = 'auto';
+  // Make the canvas fill the slide element directly (avoid percentage->transform complications)
+  canvas.style.top = '0';
+  canvas.style.left = '0';
+  canvas.style.transform = 'none';
+  canvas.style.width = '100%';
+  canvas.style.height = '100%';
   canvas.style.display = 'block';
   canvas.style.background = 'transparent';
   slideElement.appendChild(canvas);
 
   const renderer = new THREE.WebGLRenderer({ canvas, alpha: true });
-  const dpr = window.devicePixelRatio || 1;
-  renderer.setPixelRatio(dpr);
+  // Limit devicePixelRatio to avoid enormous drawing buffers on some setups
+  const initialDpr = Math.min(window.devicePixelRatio || 1, 2);
+  renderer.setPixelRatio(initialDpr);
   renderer.setClearColor(0x000000, 0); // прозрачный фон
 
   // Helper: set renderer drawing buffer size to the displayed canvas size (in CSS pixels * DPR)
   function updateRendererSizeToCanvas() {
     try {
-      const rect = canvas.getBoundingClientRect();
-      const displayW = Math.max(1, Math.floor(rect.width));
-      const displayH = Math.max(1, Math.floor(rect.height));
-      renderer.setSize(displayW * dpr, displayH * dpr, false);
+      // Prefer the slide element's layout size (more stable) instead of canvas bounding rect
+      let displayW = Math.max(1, Math.floor(slideElement.clientWidth || 0));
+      let displayH = Math.max(1, Math.floor(slideElement.clientHeight || 0));
+      // Fallback to canvas bounding rect if client sizes are not yet available
+      if (!displayW || !displayH) {
+        const rect = canvas.getBoundingClientRect();
+        displayW = Math.max(1, Math.floor(rect.width));
+        displayH = Math.max(1, Math.floor(rect.height));
+      }
+      // Defensive clamps to avoid absurd sizes (causes invisible rendering or browser issues)
+      const maxViewport = Math.max(window.innerWidth || 1024, window.innerHeight || 1024);
+      const cap = Math.max(1024, Math.min(8192, Math.floor(maxViewport * 2)));
+      if (displayW > cap) displayW = cap;
+      if (displayH > cap) displayH = cap;
+      const usedDpr = Math.min(window.devicePixelRatio || 1, 2);
+      renderer.setPixelRatio(usedDpr);
+      // setSize expects CSS pixel dimensions; three.js will multiply by pixelRatio internally.
+      renderer.setSize(displayW, displayH, false);
       if (instance && instance.camera) {
         instance.camera.aspect = displayW / displayH;
         instance.camera.updateProjectionMatrix();
@@ -637,19 +910,20 @@ async function initThreeForSlide(slideElement, modelConfig, slideIndex) {
   // НАСТРАИВАЕМ ОСВЕЩЕНИЕ
   setupLighting(scene);
 
-  // Compute initial aspect from the displayed canvas rect to avoid undefined w/h
+  // Compute initial aspect from the slide element's client size (more stable than getBoundingClientRect)
   let initialAspect = 1;
   try {
-    const r = canvas.getBoundingClientRect();
-    const dw = Math.max(1, Math.floor(r.width));
-    const dh = Math.max(1, Math.floor(r.height));
-    initialAspect = dw / dh || 1;
-  } catch (e) {
-    try {
-      initialAspect = Math.max(1, slideElement.clientWidth) / Math.max(1, slideElement.clientHeight);
-    } catch (e2) {
-      initialAspect = 1;
+    const dw = Math.max(1, Math.floor(slideElement.clientWidth || 0));
+    const dh = Math.max(1, Math.floor(slideElement.clientHeight || 0));
+    if (dw > 0 && dh > 0) initialAspect = dw / dh;
+    else {
+      const r = canvas.getBoundingClientRect();
+      const rw = Math.max(1, Math.floor(r.width));
+      const rh = Math.max(1, Math.floor(r.height));
+      initialAspect = rw / rh || 1;
     }
+  } catch (e) {
+    initialAspect = 1;
   }
   const camera = new THREE.PerspectiveCamera(42, initialAspect, 0.1, 1000);
   camera.position.set(
@@ -815,8 +1089,14 @@ function updateSlidePositions() {
             displayH = Math.max(1, Math.floor(rect.height));
           }
         } catch (e) {}
-        const dpr = window.devicePixelRatio || 1;
-        inst.renderer.setSize(displayW * dpr, displayH * dpr, false);
+        // clamp display sizes before setting renderer buffer
+        const maxViewport = Math.max(window.innerWidth || 1024, window.innerHeight || 1024);
+        const cap = Math.max(1024, Math.min(8192, Math.floor(maxViewport * 2)));
+        if (displayW > cap) displayW = cap;
+        if (displayH > cap) displayH = cap;
+        const usedDpr = Math.min(window.devicePixelRatio || 1, 2);
+        inst.renderer.setPixelRatio(usedDpr);
+        inst.renderer.setSize(displayW, displayH, false);
         if (inst.camera) {
           inst.camera.aspect = displayW / displayH;
           inst.camera.updateProjectionMatrix();
@@ -899,7 +1179,37 @@ async function buildCarousel() {
   slidesArray = document.querySelectorAll('.slide');
   
   for (let i = 0; i < slidesArray.length; i++) {
-    await initThreeForSlide(slidesArray[i], MODELS_CONFIG[i], i);
+    // Initialize slide; if size/layout problems occur, retry a few times
+    let attempts = 0;
+    const MAX_ATTEMPTS = 4;
+    let inst = null;
+    while (attempts < MAX_ATTEMPTS) {
+      try {
+        await initThreeForSlide(slidesArray[i], MODELS_CONFIG[i], i);
+      } catch (e) {
+        console.warn(`[buildCarousel] initThreeForSlide attempt ${attempts} failed for index ${i}:`, e);
+      }
+      inst = threeInstances[i];
+      // Ensure renderer and model are present and renderer has non-zero drawing buffer
+      const hasRenderer = inst && inst.renderer && inst.renderer.domElement;
+      const rendererSizeOk = hasRenderer && inst.renderer.domElement.width > 0 && inst.renderer.domElement.height > 0;
+      const hasModel = inst && inst.modelGroup;
+      if (hasRenderer && rendererSizeOk && hasModel) break;
+      // try to force a resize and retry loading model
+      try {
+        console.warn(`[buildCarousel] retrying init for slide ${i} — rendererSizeOk=${rendererSizeOk} hasModel=${!!hasModel}`);
+        if (inst && inst.updateRendererSizeToCanvas) inst.updateRendererSizeToCanvas();
+        // if model missing, try loading again
+        if (inst && !hasModel) {
+          await loadModelIntoSlide(i, MODELS_CONFIG[i]);
+        }
+      } catch (e) {
+        console.warn(`[buildCarousel] retry helper failed for slide ${i}:`, e);
+      }
+      attempts++;
+      // small backoff
+      await new Promise(r => setTimeout(r, 180 * attempts));
+    }
   }
   
   for (let i = 0; i < 3; i++) {
@@ -943,8 +1253,14 @@ async function buildCarousel() {
             displayH = Math.max(1, Math.floor(rect.height));
           }
         } catch (e) {}
-        const dpr = window.devicePixelRatio || 1;
-        inst.renderer.setSize(displayW * dpr, displayH * dpr, false);
+        // clamp sizes to reasonable maximums
+        const maxViewport = Math.max(window.innerWidth || 1024, window.innerHeight || 1024);
+        const cap = Math.max(1024, Math.min(8192, Math.floor(maxViewport * 2)));
+        if (displayW > cap) displayW = cap;
+        if (displayH > cap) displayH = cap;
+        const usedDpr = Math.min(window.devicePixelRatio || 1, 2);
+        inst.renderer.setPixelRatio(usedDpr);
+        inst.renderer.setSize(displayW, displayH, false);
         if (inst.camera) {
           inst.camera.aspect = displayW / displayH;
           inst.camera.updateProjectionMatrix();
@@ -955,6 +1271,16 @@ async function buildCarousel() {
   });
 
   setupDragAndDrop();
+  // After carousel built, run stabilization for each instance as-if the slide was shifted
+  // (this mirrors the fixes that happen when user shifts the carousel) without changing colors.
+  try {
+    threeInstances.forEach((inst, idx) => {
+      // stagger a bit to avoid blocking layout
+      setTimeout(() => {
+        try { stabilizeInstanceAsIfShifted(inst, idx); } catch (e) {}
+      }, 120 + idx * 80);
+    });
+  } catch (e) {}
   console.log('✅ Синхронная карусель готова!');
 
   window.addEventListener('wheel', () => {

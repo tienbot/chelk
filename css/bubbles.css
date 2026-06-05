@@ -1,0 +1,152 @@
+.bubbles-container {
+  width: 100%;
+  height: 100%;
+  margin: 0 auto;
+  overflow: hidden;
+  position: fixed;
+  top: 0;
+  pointer-events: none;
+}
+
+.bubble {
+  position: absolute;
+  width: min(28vw, 240px);
+  max-width: none;
+  cursor: pointer;
+  transition: transform 3.5s ease-in;
+  animation: float var(--float-duration, 5s) ease-in-out infinite alternate;
+  will-change: transform;
+  pointer-events: auto;
+}
+
+.bubble.falling {
+  transform: translateY(120vh) !important;
+}
+
+.bubble-inner {
+  border-radius: 50%;
+  display: block;
+  position: relative;
+  width: 100%;
+  height: 0;
+  padding-bottom: 100%;
+  transition: transform 0.25s ease;
+}
+
+.bubble-inner:before,
+.bubble-inner:after,
+.bubble-inner span {
+  border-radius: 50%;
+  content: '';
+  display: block;
+  position: absolute;
+  pointer-events: none;
+}
+
+.bubble-inner:before {
+  background: #fff;
+  transform: rotate(-30deg);
+}
+
+.bubble-inner span {
+  background: radial-gradient(at center bottom, transparent, transparent 70%, rgba(255, 255, 255, 0.85));
+}
+
+.bubble .bubble-inner {
+  box-shadow:
+    0 -0.18vw 0.3vw #fff inset,
+    0 -0.48vw 1.1vw var(--bubble-color, #1d737b) inset,
+    0 0.09vw 2.9vw var(--bubble-color, #1d737b) inset,
+    0.09vw 0 0.3vw #fff inset,
+    -0.09vw 0 0.3vw #fff inset,
+    0 0.25vw 1.1vw #ffffff inset;
+}
+
+.bubble .bubble-inner:before {
+  top: 12%;
+  left: 18%;
+  width: 17%;
+  height: 7%;
+}
+.bubble .bubble-inner:after {
+  top: 15%;
+  left: 15%;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.bubble .bubble-inner span {
+  top: 2%;
+  left: 10%;
+  width: 79%;
+  height: 60%;
+}
+
+/* Текст */
+.bubble-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 84%;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.95);
+  font-size: calc(9px + 0.75vw);
+  line-height: 1.15;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.7s ease;
+}
+
+.bubble-inner:hover .bubble-text {
+  opacity: 1;
+}
+
+@keyframes shake {
+  from {
+    transform: scale(1, 1);
+  }
+  33% {
+    transform: scale(1, 1.1);
+  }
+  66% {
+    transform: scale(1.1, 1);
+  }
+  to {
+    transform: scale(1, 1);
+  }
+}
+
+.bubble-inner.shake {
+  animation: shake 0.4s linear;
+}
+@keyframes float {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(var(--float-x, 6vw), -6.5vh, 0);
+  }
+}
+
+.bubble.disabled,
+.bubble.falling {
+  animation-play-state: paused !important;
+}
+
+/* removed .bubble.locked rule to ensure hover-only text visibility */
+
+/* While spawning, ignore pointer on inner so moving bubble doesn't trigger hover */
+.bubble.spawning .bubble-inner {
+  pointer-events: none;
+}
+
+.bubbles-btn {
+  position: absolute;
+  left: 50%;
+  top: 37%;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  background: white;
+  pointer-events: auto;
+}

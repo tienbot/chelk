@@ -172,29 +172,22 @@ function updateTargetFromPointer(clientX, clientY) {
   targetModelRotationX = 0
 }
 
-canvas.addEventListener(
-  'mousemove',
-  (e) => {
+// Track pointer globally so the head follows the cursor even when hovering UI elements.
+// Use Pointer Events to cover mouse and touch in one handler; keep buttons clickable.
+window.addEventListener('pointermove', (e) => {
+  try {
     updateTargetFromPointer(e.clientX, e.clientY)
-  },
-  { passive: true },
-)
+  } catch (err) {}
+}, { passive: true })
 
-// Поддержка сенсорных экранов
-canvas.addEventListener(
-  'touchmove',
-  (e) => {
-    if (e.touches && e.touches[0]) {
-      updateTargetFromPointer(e.touches[0].clientX, e.touches[0].clientY)
+// When pointer leaves the page/window (relatedTarget === null), reset head to neutral.
+window.addEventListener('pointerout', (e) => {
+  try {
+    if (!e.relatedTarget) {
+      targetModelRotationY = 0
+      targetModelRotationX = 0
     }
-  },
-  { passive: true },
-)
-
-// Когда курсор покидает canvas — возвращаем модель в нейтральное положение
-canvas.addEventListener('mouseleave', () => {
-  targetModelRotationY = 0
-  targetModelRotationX = 0
+  } catch (err) {}
 })
 
 // reset view UI removed; keep programmatic reset function if needed

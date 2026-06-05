@@ -7,10 +7,11 @@
   let accumulatedTime = 0
   let isRunning = true
 
+  // keys are normalized to lowercase for case-insensitive matching
   const NAME_COLOR_MAP = {
-    'Хорека': '#C4142D',
-    'Косметика': '#7B1D7B',
-    'Одежда': '#1D737B'
+    'хорека': '#C4142D',
+    'косметика': '#7B1D7B',
+    'одежда': '#1D737B'
   }
 
   const styleSheet = document.createElement('style')
@@ -168,4 +169,16 @@
   })
 
   window.changeColor = changeColor
+
+  // Listen for mainObject selection changes (custom event) and apply color
+  window.addEventListener('mainObjectChange', (ev) => {
+    try {
+      const payload = ev && ev.detail ? ev.detail : ev
+      const name = String(payload || '').toLowerCase()
+      const newColor = NAME_COLOR_MAP[name]
+      if (newColor) changeColor(newColor)
+    } catch (e) {
+      // silent
+    }
+  })
 })()
