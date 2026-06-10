@@ -157,6 +157,8 @@
     
     if (choiceBtn) {
       choiceBtn.addEventListener('click', () => {
+        // enable lines visibility toggling from scroll behavior after explicit user choice
+        try { window._linesEnabled = true } catch (e) {}
         document.querySelector('.lines')?.classList.add('visible')
         if (svgTemplate) startInfiniteAnimation()
       })

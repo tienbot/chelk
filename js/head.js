@@ -73,7 +73,29 @@ exportGroup.add(rimRightLight)
 exportGroup.add(frontLight)
 exportGroup.add(fillLight)
 
+const headHighlightLight = new THREE.PointLight(0xFFAA66, 0.0)
+headHighlightLight.position.set(0, 0.7, 0.5)
+headHighlightLight.distance = 3.0
+headHighlightLight.decay = 1.2
+scene.add(headHighlightLight)
+
+const headGlowLight = new THREE.PointLight(0xFF8855, 0.0)
+headGlowLight.distance = 2.5
+headGlowLight.decay = 1.5
+scene.add(headGlowLight)
+
+exportGroup.add(headHighlightLight)
+exportGroup.add(headGlowLight)
+
 let currentModel = null
+let raycaster = new THREE.Raycaster()
+let mouseVector = new THREE.Vector2()
+let targetHighlightIntensity = 0
+let currentHighlightIntensity = 0
+let targetGlowIntensity = 0
+let currentGlowIntensity = 0
+let headMeshes = []
+
 // Параметры слежения модели за курсором (горизонталь + вертикаль)
 let targetModelRotationY = 0
 let targetModelRotationX = 0
@@ -140,11 +162,27 @@ function loadModelFromURL(url, name = '') {
       exportGroup.add(currentModel)
 
       const box = new THREE.Box3().setFromObject(currentModel)
+      const modelCenterX = (box.min.x + box.max.x) / 2
+      const modelCenterZ = (box.min.z + box.max.z) / 2
+      const headHeight = box.max.y
+      headHighlightLight.position.set(modelCenterX, headHeight - 0.1, modelCenterZ + 0.3)
+      headGlowLight.position.set(modelCenterX, headHeight - 0.15, modelCenterZ + 0.25)
+      findHeadMeshes(currentModel)
       const size = box.getSize(new THREE.Vector3())
+      try {
+        if (window.preloader && typeof window.preloader.markModelLoaded === 'function') {
+          window.preloader.markModelLoaded()
+        }
+      } catch (e) {}
     },
     (xhr) => {
       if (xhr && xhr.total) {
         const percent = Math.floor((xhr.loaded / xhr.total) * 100)
+        try {
+          if (window.preloader && typeof window.preloader.reportModelProgress === 'function') {
+            window.preloader.reportModelProgress(xhr.loaded, xhr.total)
+          }
+        } catch (e) {}
       }
     },
     (error) => {
@@ -155,6 +193,100 @@ function loadModelFromURL(url, name = '') {
 
 // Отключена загрузка через UI, но сразу подгружаем встроенную модель models/head.glb
 loadModelFromURL('./models/head.glb', 'head.glb')
+
+function findHeadMeshes(model) {
+  headMeshes = []
+  model.traverse((child) => {
+    if (child.isMesh) {
+      const name = child.name.toLowerCase()
+      if (name.includes('head') || name.includes('skull') || name.includes('face') || name.includes('cranium') || name === 'neck' || name.includes('helmet') || name.includes('hair')) {
+        headMeshes.push(child)
+      }
+    }
+  })
+
+  if (headMeshes.length === 0) {
+    let highestY = -Infinity
+    let highestMesh = null
+    model.traverse((child) => {
+      if (child.isMesh) {
+        const box = new THREE.Box3().setFromObject(child)
+        const centerY = (box.min.y + box.max.y) / 2
+        if (centerY > highestY) {
+          highestY = centerY
+          highestMesh = child
+        }
+      }
+    })
+    if (highestMesh) {
+      headMeshes = [highestMesh]
+    } else {
+      headMeshes = null
+    }
+  }
+}
+
+function updateHeadlightIntensity(deltaTime) {
+  const lerpSpeed = 8.0
+  currentHighlightIntensity += (targetHighlightIntensity - currentHighlightIntensity) * Math.min(1.0, lerpSpeed * deltaTime)
+  currentGlowIntensity += (targetGlowIntensity - currentGlowIntensity) * Math.min(1.0, lerpSpeed * deltaTime)
+  headHighlightLight.intensity = currentHighlightIntensity
+  headGlowLight.intensity = currentGlowIntensity
+  const boostedColor = rimLeftLight.color.clone().multiplyScalar(1.3)
+  headHighlightLight.color.set(boostedColor)
+  headGlowLight.color.set(rimLeftLight.color)
+}
+
+function checkHeadHover(clientX, clientY) {
+  if (!currentModel) {
+    targetHighlightIntensity = 0
+    targetGlowIntensity = 0
+    return
+  }
+
+  const rect = renderer.domElement.getBoundingClientRect()
+  const x = clientX - rect.left
+  const y = clientY - rect.top
+  if (x < 0 || x > rect.width || y < 0 || y > rect.height) {
+    targetHighlightIntensity = 0
+    targetGlowIntensity = 0
+    return
+  }
+
+  mouseVector.x = (x / rect.width) * 2 - 1
+  mouseVector.y = -(y / rect.height) * 2 + 1
+  raycaster.setFromCamera(mouseVector, camera)
+
+  let intersects = []
+  if (Array.isArray(headMeshes) && headMeshes.length > 0) {
+    intersects = raycaster.intersectObjects(headMeshes, true)
+  } else if (headMeshes === null) {
+    const allMeshes = []
+    currentModel.traverse((child) => { if (child.isMesh) allMeshes.push(child) })
+    const allIntersects = raycaster.intersectObjects(allMeshes, true)
+    if (allIntersects.length > 0) {
+      const hitPoint = allIntersects[0].point
+      const modelBox = new THREE.Box3().setFromObject(currentModel)
+      const headThreshold = modelBox.min.y + (modelBox.max.y - modelBox.min.y) * 0.7
+      if (hitPoint.y > headThreshold) intersects = [allIntersects[0]]
+    }
+  }
+
+  if (intersects.length > 0) {
+    targetHighlightIntensity = 2.2
+    targetGlowIntensity = 1.5
+    const hitPoint = intersects[0].point
+    headHighlightLight.position.copy(hitPoint.clone().add(new THREE.Vector3(0.1, 0.25, 0.25)))
+    headGlowLight.position.copy(hitPoint.clone().add(new THREE.Vector3(0.05, 0.15, 0.2)))
+    if (renderer && renderer.domElement) renderer.domElement.style.cursor = 'pointer'
+    return true
+  } else {
+    targetHighlightIntensity = 0
+    targetGlowIntensity = 0
+    if (renderer && renderer.domElement) renderer.domElement.style.cursor = 'default'
+    return false
+  }
+}
 
 // Обработчики указателя: обновляют целевой угол поворота модели
 function updateTargetFromPointer(clientX, clientY) {
@@ -174,9 +306,31 @@ function updateTargetFromPointer(clientX, clientY) {
 
 // Track pointer globally so the head follows the cursor even when hovering UI elements.
 // Use Pointer Events to cover mouse and touch in one handler; keep buttons clickable.
+function playHeadClickSound() {
+  try {
+    const audio = new Audio('audio/chelk.mp3')
+    audio.loop = false
+    audio.play().catch((err) => console.warn('Head chelk playback failed:', err))
+  } catch (err) {
+    console.warn('Failed to play head click sound:', err)
+  }
+}
+
 window.addEventListener('pointermove', (e) => {
   try {
     updateTargetFromPointer(e.clientX, e.clientY)
+    checkHeadHover(e.clientX, e.clientY)
+  } catch (err) {}
+}, { passive: true })
+
+window.addEventListener('pointerdown', (e) => {
+  try {
+    const headSection = document.querySelector('section.head') || document.querySelector('.head')
+    if (!headSection || !headSection.classList.contains('visible')) return
+    if (checkHeadHover(e.clientX, e.clientY) && typeof window.triggerBubbleSpawn === 'function') {
+      playHeadClickSound()
+      window.triggerBubbleSpawn({ triggeredBy: 'head' })
+    }
   } catch (err) {}
 }, { passive: true })
 
@@ -186,6 +340,8 @@ window.addEventListener('pointerout', (e) => {
     if (!e.relatedTarget) {
       targetModelRotationY = 0
       targetModelRotationX = 0
+      targetHighlightIntensity = 0
+      targetGlowIntensity = 0
     }
   } catch (err) {}
 })
@@ -255,8 +411,196 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight)
 })
 
+// Fade head elements on scroll while keeping bubbles visible.
+function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+function initHeadScrollFade() {
+  try {
+    const canvasEl = document.getElementById('canvas');
+    const titleL = document.querySelector('.head__title.left');
+    const titleR = document.querySelector('.head__title.right');
+    const desc = document.querySelector('.head__description');
+    const headSection = document.querySelector('section.head') || document.querySelector('.head');
+    const linesEl = document.querySelector('.lines');
+    const carouselTrack = document.querySelector('.carousel-track');
+    const scrollSection = document.querySelector('.scroll-section');
+    const bubblesContainer = headSection.querySelector('.bubbles-container');
+    if (!canvasEl || !headSection) return;
+
+    // Simple, predictable opacity transitions
+    [headSection, canvasEl, titleL, titleR, desc, bubblesContainer].forEach((el) => {
+      try { if (el) el.style.transition = 'opacity 1200ms ease'; } catch (e) {}
+    });
+    if (headSection) {
+      try {
+        headSection.style.transition = 'opacity 1200ms ease, visibility 0ms linear 0ms';
+      } catch (e) {}
+    }
+    if (carouselTrack) {
+      try { carouselTrack.style.transition = 'opacity 600ms cubic-bezier(0.2,0,0.1,1), visibility 0ms linear 0ms'; } catch (e) {}
+    }
+
+    let fadeWheel = 0;
+    let lastExtrasVisible = null;
+    let hasScrolled = false;
+    let headPermanentlyHidden = false;
+    const fadeMax = Math.max(window.innerHeight * 0.8, 320);
+    const gameSection = document.querySelector('.game');
+
+    if (gameSection) {
+      try {
+        gameSection.style.transition = 'opacity 900ms ease';
+        gameSection.style.opacity = '0';
+        gameSection.style.pointerEvents = 'none';
+        gameSection.style.visibility = 'hidden';
+      } catch (e) {}
+    }
+
+    function showExtras() {
+      try {
+        if (linesEl) {
+          linesEl.classList.remove('visible');
+        }
+        if (scrollSection) {
+          scrollSection.classList.remove('visible');
+          scrollSection.style.display = 'none';
+        }
+      } catch (e) {}
+    }
+
+    function updateExtras() {
+      if (lastExtrasVisible === false) return;
+      lastExtrasVisible = false;
+      showExtras();
+    }
+
+    function shouldRunFade() {
+      return Boolean(window.bubbleClick) && !headPermanentlyHidden;
+    }
+
+    let headHideTimeout = null;
+    function clearHeadHideTimeout() {
+      if (headHideTimeout) {
+        clearTimeout(headHideTimeout);
+        headHideTimeout = null;
+      }
+    }
+    function scheduleHeadHide() {
+      clearHeadHideTimeout();
+      if (!headSection) return;
+      headHideTimeout = setTimeout(() => {
+        try {
+          if (parseFloat(headSection.style.opacity) <= 0.01) {
+            headSection.style.setProperty('display', 'none', 'important');
+            headSection.classList.remove('visible');
+            headSection.classList.add('head-hidden-permanent');
+            headPermanentlyHidden = true;
+          }
+        } catch (e) {}
+        headHideTimeout = null;
+      }, 80);
+    }
+
+    function updateFade(opacity) {
+      if (headPermanentlyHidden) return;
+      const visibleOpacity = String(opacity);
+      if (headSection && opacity > 0 && headSection.style.display === 'none') {
+        headSection.style.display = 'flex';
+      }
+      [headSection, canvasEl, titleL, titleR, desc, bubblesContainer].forEach((el) => { try { if (el) el.style.opacity = visibleOpacity; } catch (e) {} });
+      if (headSection) {
+        try {
+          headSection.style.pointerEvents = opacity > 0.05 ? '' : 'none';
+          headSection.style.visibility = opacity > 0 ? 'visible' : 'hidden';
+          if (opacity <= 0.01) {
+            scheduleHeadHide();
+          } else {
+            clearHeadHideTimeout();
+          }
+        } catch (e) {}
+      }
+      if (carouselTrack) {
+        try {
+          carouselTrack.style.opacity = '';
+          carouselTrack.style.pointerEvents = '';
+          carouselTrack.style.visibility = '';
+        } catch (e) {}
+      }
+      if (gameSection) {
+        const gameOp = 1 - opacity;
+        try {
+          gameSection.style.opacity = String(gameOp);
+          gameSection.style.pointerEvents = gameOp > 0.05 ? 'auto' : 'none';
+          gameSection.style.visibility = gameOp > 0 ? 'visible' : 'hidden';
+        } catch (e) {}
+      }
+      updateExtras(opacity);
+    }
+
+    function handleWheel(e) {
+      if (!shouldRunFade()) return;
+      try {
+        const delta = e.deltaY || 0;
+        if (delta !== 0) hasScrolled = true;
+        fadeWheel = Math.max(0, Math.min(fadeMax, fadeWheel + delta));
+        const progress = fadeWheel / fadeMax;
+        const op = 1 - Math.pow(Math.min(1, progress), 2);
+        updateFade(op);
+      } catch (e) {}
+    }
+
+    function handleTouchMove(e) {
+      if (!shouldRunFade() || !e.touches || !e.touches.length) return;
+      try {
+        const y = e.touches[0].clientY;
+        if (typeof window._lastHeadTouchY === 'number') {
+          const delta = window._lastHeadTouchY - y;
+          if (delta !== 0) hasScrolled = true;
+          fadeWheel = Math.max(0, Math.min(fadeMax, fadeWheel + delta));
+          const progress = fadeWheel / fadeMax;
+          const op = 1 - Math.pow(Math.min(1, progress), 2);
+          updateFade(op);
+        }
+        window._lastHeadTouchY = y;
+      } catch (e) {}
+    }
+
+    function resetTouch() {
+      window._lastHeadTouchY = null;
+    }
+
+    function onScroll() {
+      if (!shouldRunFade()) return;
+      const top = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+      if (top !== 0) hasScrolled = true;
+      fadeWheel = Math.max(0, Math.min(fadeMax, top));
+      const progress = fadeWheel / fadeMax;
+      const op = 1 - Math.pow(Math.min(1, progress), 2);
+      updateFade(op);
+    }
+
+    window.addEventListener('wheel', handleWheel, { passive: true });
+    window.addEventListener('touchmove', handleTouchMove, { passive: true });
+    window.addEventListener('touchend', resetTouch, { passive: true });
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', () => {
+      fadeWheel = Math.min(fadeWheel, Math.max(window.innerHeight * 0.8, 320));
+    }, { passive: true });
+    if (window.bubbleClick) {
+      updateFade(1);
+    }
+  } catch (e) {}
+}
+
+// init on load (if head elements already present)
+try { if (document.readyState === 'complete' || document.readyState === 'interactive') setTimeout(initHeadScrollFade, 80); else window.addEventListener('DOMContentLoaded', () => setTimeout(initHeadScrollFade, 80)); } catch (e) {}
+
+let lastFrameTime = performance.now()
 function animate() {
   requestAnimationFrame(animate)
+  const now = performance.now()
+  const delta = Math.min(0.033, (now - lastFrameTime) / 1000)
+  lastFrameTime = now
+  updateHeadlightIntensity(delta)
   controls.update()
   // Плавный поворот модели к целевому углу, вычисленному по указателю
   if (currentModel) {

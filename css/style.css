@@ -30,7 +30,7 @@
   opacity: 1;
 }
 .sound-descr {
-  color: #fff;
+  color: #7B7B7C;
   position: fixed;
   top: 50%;
   left: 50%;
@@ -39,6 +39,10 @@
   margin-top: 120px;
   opacity: 0;
   transition: opacity 1.5s cubic-bezier(0.4,0,0.2,1);
+  padding: 4px 15px;
+  background: #0E0F11;
+  border-radius: 75px;
+  height: 28px;
 }
 .sound-btn.visible ~ .sound-descr {
   opacity: 1;
@@ -57,7 +61,7 @@ section#main-section > :not(.svg-background) {
 section#main-section.visible > :not(.svg-background),
 section#main-section > .show-after-sound {
   /* opacity: 1 !important; */
-  pointer-events: none;
+  pointer-events: auto;
   z-index: 1;
 }
 canvas {
@@ -95,9 +99,9 @@ canvas {
 body {
   background-color: #121315;
   font-family: 'Avenir_Next_W1G_Medium';
+  min-height: 100vh;
+  width: 100%;
   overflow: hidden;
-  height: 100vh;
-  width: 100vw;
 }
 
 button{
@@ -153,6 +157,7 @@ section.loading.hide {
   height: 100%;
   transform-style: preserve-3d;
   pointer-events: auto !important;
+  transition: opacity 600ms cubic-bezier(0.2,0,0.1,1), visibility 0ms linear 0ms;
 }
 
 .slide {
@@ -490,7 +495,7 @@ section.loading.hide {
   color: white;
   font-size: 12px;
   text-transform: uppercase;
-  position: absolute;
+  position: fixed;
   bottom: 50px;
   left: 50%;
   width: auto;
@@ -622,4 +627,21 @@ section.loading.hide {
   opacity: 1 !important;
   pointer-events: auto;
   transform: none !important;
+}
+
+.game {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 900ms ease, visibility 0ms linear 900ms;
+  /* z-index: 220; */
+  color: white;
+  text-align: center;
+  font-size: clamp(2rem, 6vw, 5rem);
+  line-height: 1.05;
 }

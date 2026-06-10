@@ -12,9 +12,12 @@
   <link rel="stylesheet" href="./css/scroll.css">
   <link rel="stylesheet" href="./css/head.css">
   <link rel="stylesheet" href="./css/bubbles.css">
+  <link rel="stylesheet" href="./css/smoke.css">
+  <link rel="stylesheet" href="./css/game.css">
 </head>
 
 <body>
+  <canvas class="smoke"></canvas>
   <section class="loading">
     <div class="container">
       <div class="loading__wrapper">
@@ -58,7 +61,6 @@
     </div>
   </section>
 
-  <!-- Кнопка sound -->
   <div id="soundOverlay" style="display:none;">
     <button id="soundBtn" class="sound-btn">
       <svg width="45" height="45" viewBox="0 0 45 45" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -67,7 +69,7 @@
           fill="white" fill-opacity="0.82" />
       </svg>
     </button>
-    <p id="soundDescr" class="sound-descr">Алхимия любит тишину, но рождается по щёлчком.</p>
+    <p id="soundDescr" class="sound-descr">✦ алхимия любит тишину, но рождается по щёлчком ✦</p>
   </div>
 
   <section id="main-section">
@@ -148,15 +150,10 @@
 
     <div class="svg-background" id="svgBackground">
       <div class="svg-rotate-wrapper">
-        <svg width="794" height="783" viewBox="0 0 794 783" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path id="svgPath1"
-            d="M368.361 130.843C435.604 130.843 505.125 154.469 557.819 194.898C610.507 235.322 646.301 292.482 646.301 359.559C646.301 426.742 615.88 499.902 568.6 556.275C521.316 612.652 457.307 652.084 390.239 652.084C323.047 652.084 253.537 623.48 200.825 578.038C148.112 532.597 112.298 470.41 112.298 403.314C112.298 336.143 142.71 268.009 189.969 216.659C237.229 165.31 301.244 130.843 368.361 130.843Z"
-            stroke="#1D737B" stroke-opacity="0.85" stroke-width="2.5" />
-          <path id="svgPath2"
-            d="M327.725 701.044C248.739 679.88 174.515 630.248 125.343 566.173C76.1746 502.103 52.1048 423.672 73.2262 344.846C94.3752 265.918 153.138 189.56 226.408 138.23C299.684 86.8964 387.298 60.7095 466.115 81.8284C545.053 102.98 617.697 158.46 665.31 228.425C712.924 298.39 735.432 382.724 714.306 461.569C693.16 540.485 635.988 610.947 564.316 656.388C492.644 701.828 406.59 722.176 327.725 701.044Z"
-            stroke="#1D737B" stroke-opacity="0.35" stroke-width="2" />
-          <circle id="svgCircle" cx="381.123" cy="392.375" r="243.301" stroke="#1D737B" stroke-width="2.5"
-            stroke-opacity="0.9" />
+        <svg width="218" height="215" viewBox="0 0 218 215" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path id="svgPath1" d="M106.072 36.2046C124.464 36.2046 143.483 42.6678 157.895 53.7251C172.303 64.7801 182.072 80.3956 182.072 98.7046C182.072 117.067 173.755 137.081 160.815 152.509C147.874 167.94 130.377 178.705 112.072 178.705C93.7056 178.705 74.6933 170.883 60.2725 158.452C45.8516 146.02 36.0723 129.024 36.0723 110.705C36.0723 92.3486 44.3851 73.7158 57.3145 59.6675C70.2439 45.6191 87.743 36.2046 106.072 36.2046Z" stroke="#BF0808" stroke-opacity="0.49"/>
+        <path id="svgPath2" d="M89.9377 192.045C68.3233 186.253 48.0096 172.67 34.5543 155.137C21.1013 137.607 14.5302 116.168 20.3001 94.6339C26.084 73.0483 42.1625 52.1477 62.2224 38.0947C82.2849 24.0399 106.244 16.8911 127.774 22.6598C149.364 28.4448 169.244 43.6241 182.275 62.7733C195.307 81.9225 201.454 104.984 195.682 126.528C189.899 148.107 174.26 167.388 154.644 179.825C135.028 192.262 111.491 197.82 89.9377 192.045Z" stroke="#BF0808" stroke-opacity="0.29"/>
+        <circle id="svgCircle" cx="108.573" cy="107.314" r="66.5" transform="rotate(30 108.573 107.314)" stroke="#BF0808" stroke-opacity="0.82"/>
         </svg>
       </div>
     </div>
@@ -444,17 +441,73 @@
       <p class="head__title left">Мысли</p>
       <p class="head__title right">клиента</p>
       <div class="head__description">
-        Этот бюст — метафора мыслей клиента
-        В ней бурлят мысли, страхи и желания
-        Каждый пузырь — идея.
+        Этот экран — шарж из мыслей клиента и агентства во время работы<br>
+        Коснитесь головы, чтобы заглянуть в мысли клиента.<br>
+        Нажмите на пузыри, чтобы понять, как вас слышит агентство.
       </div>
-      <div class="bubbles-container">
-        <button class="bubbles-btn">пузырь</button>
+      <div class="bubbles-container"></div>
+    </div>
+  </section>
+  <!-- <section class="game">
+    test
+  </section> -->
+  <div class="game bubbles-container2">
+    <div class="game-text">Лови правильные идеи. Не теряй их. Серые крадут энергию</div>
+    <div class="message-panel" id="messagePanel"></div>
+    <div class="platform">
+      <div class="device-rotator">
+        <div class="device" data-index="0" style="--progress:0%;">
+          <div class="thermostat">
+            <div class="glass-container">
+              <div class="liquid"><div class="bg"></div><div class="bubbles"></div></div>
+              <div class="glass-reflection"></div>
+              <div class="glass-blink"></div>
+              <div class="glass-text">Старт</div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
-
-    <!-- Load panel and settings removed per request -->
-  </section>
+    <div class="controls-panel" id="controlsPanel">
+      <div class="colbs-panel" id="colbsContainer">
+        <div class="colb-card"><div class="glass-range"><span class="range-title">Креатив</span><div class="range-line-track"><div class="range-line" style="left: 0%;"></div></div><input type="range" data-index="0" min="0" max="1" step="0.01" class="range-input"></div></div>
+        <div class="colb-card"><div class="glass-range"><span class="range-title">Стратегия</span><div class="range-line-track"><div class="range-line" style="left: 0%;"></div></div><input type="range" data-index="1" min="0" max="1" step="0.01" class="range-input"></div></div>
+        <div class="colb-card"><div class="glass-range"><span class="range-title">Тренды</span><div class="range-line-track"><div class="range-line" style="left: 0%;"></div></div><input type="range" data-index="2" min="0" max="1" step="0.01" class="range-input"></div></div>
+        <div class="colb-card"><div class="glass-range"><span class="range-title">Провокация</span><div class="range-line-track"><div class="range-line" style="left: 0%;"></div></div><input type="range" data-index="3" min="0" max="1" step="0.01" class="range-input"></div></div>
+        <div class="colb-card"><div class="glass-range"><span class="range-title">Х-фактор</span><div class="range-line-track"><div class="range-line" style="left: 0%;"></div></div><input type="range" data-index="4" min="0" max="1" step="0.01" class="range-input"></div></div>
+      </div>
+    </div>
+    <div class="points-wrapper">
+      <div class="game-point"></div>
+      <div class="game-point"></div>
+      <div class="game-point"></div>
+      <div class="game-point"></div>
+      <div class="game-point"></div>
+      <div class="game-point"></div>
+      <div class="game-point"></div>
+    </div>
+    <span class="point-desc" id="pointsCounter">0 / 7 частей (0% жидкости)</span>
+  </div>
+  <div class="mix-button-wrapper" id="mixWrapper">
+    <button class="mix-btn" id="mixBtn" type="button">Смешать</button>
+  </div>
+  <div id="lottieSection">
+    <div class="lottie-section-content">
+      <p>Красивое продаётся по щелчку <br>
+        Остальное ждёт скидки.</p>
+      <div class="lottie-pattern"></div>
+    </div>
+    <div class="lottie-actions">
+      <button type="button" class="lottie-btn replay-btn">СЫГРАТЬ ЕЩЁ РАЗ</button>
+      <button type="button" class="lottie-btn request-btn">Оставить заявку</button>
+    </div>
+  </div>
+  <div id="lottieOverlay">
+    <div id="lottieScrollArea">
+      <div id="lottieContainer"></div>
+      <div id="lottieSpacer"></div>
+    </div>
+  </div>
 
   <script type="importmap">
       {
@@ -464,14 +517,25 @@
         }
       }
     </script>
+  <script>
+    window.preloader = window.preloader || {
+      _queue: [],
+      reportModelProgress: function (loaded, total) {
+        this._queue.push(['reportModelProgress', loaded, total]);
+      },
+      markModelLoaded: function () {
+        this._queue.push(['markModelLoaded']);
+      },
+      markWindowLoaded: function () {
+        this._queue.push(['markWindowLoaded']);
+      },
+    };
+  </script>
   <script type="module">
-    // 1. Сразу инициализируем основной контент
     import('./js/script.js').then(script => {
       if (script && script.initTextSlides) script.initTextSlides();
-      // `buildCarousel` must run only after user gesture (sound button)
       if (script && script.initKeyboardControls) script.initKeyboardControls();
     });
-    // 2. Запускаем прелоадер, он просто перекрывает контент
     import('./js/preloader.js').then(({ runPreloader }) => {
       runPreloader({ onComplete: () => { } });
     });
@@ -480,6 +544,8 @@
   <script src="./js/scroll.js"></script>
   <script type="module" src="./js/head.js"></script>
   <script src="./js/bubbles.js"></script>
+  <script src="./js/smoke.js"></script>
+  <script src="./js/game.js"></script>
 </body>
 
 </html>

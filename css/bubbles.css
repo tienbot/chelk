@@ -95,11 +95,23 @@
   line-height: 1.15;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 0.7s ease;
+  transition: opacity 0.18s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
 }
 
 .bubble-inner:hover .bubble-text {
   opacity: 1;
+}
+.bubble-label{
+  color: #616366;
+  font-size: 12px;
+  background-color: #0E0F11;
+  border-radius: 41px;
+  padding: 3px 12px;
+  width: fit-content;
 }
 
 @keyframes shake {

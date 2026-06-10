@@ -4,13 +4,18 @@ export function runPreloader({ onComplete }) {
   const tensElement = document.getElementById('tens');
   const unitsElement = document.getElementById('units');
 
-  const TOTAL_STEPS = 1 + 3; // window + 3 glb
-  let loadedSteps = 0;
-  let currentPercent = 0;
+  const preloaderState = {
+    windowLoaded: false,
+    modelLoaded: false,
+    modelProgress: 0,
+    modelTotal: 0,
+  }
+  let displayedPercent = 0;
+  let targetPercent = 0;
   let animationFrame = null;
-  let startTime = null;
-  const DELAY_MS = 1000;
   let finished = false;
+  let soundBtnClicked = false;
+  const MAX_WAIT_MS = 15000;
 
   function animateDigit(element, newValue) {
     const oldValue = element.textContent;
@@ -18,54 +23,113 @@ export function runPreloader({ onComplete }) {
     element.textContent = newValue;
   }
 
-  function setLoadingPercent(p) {
-    currentPercent = Math.max(currentPercent, p);
-    let percent = Math.round(currentPercent);
-    if (percent > 99) percent = 99;
+  function renderPercent(value) {
+    const percent = Math.min(99, Math.max(0, Math.round(value)));
     const tens = Math.floor(percent / 10);
     const units = percent % 10;
-    animateDigit(unitsElement, units);
-    if (percent === 0 || units === 0) {
+    if (tensElement.textContent !== tens.toString()) {
       animateDigit(tensElement, tens);
+    }
+    if (unitsElement.textContent !== units.toString()) {
+      animateDigit(unitsElement, units);
+    }
+  }
+
+  function setLoadingPercent(p) {
+    const percent = Math.min(99, Math.max(0, Math.round(p)));
+    if (percent > targetPercent) {
+      targetPercent = percent;
+    }
+  }
+
+  function getCombinedProgress() {
+    const windowFraction = preloaderState.windowLoaded ? 1 : 0;
+    const modelFraction = preloaderState.modelLoaded
+      ? 1
+      : preloaderState.modelTotal > 0
+      ? Math.min(1, preloaderState.modelProgress / preloaderState.modelTotal)
+      : 0;
+    return (windowFraction + modelFraction) / 2;
+  }
+
+  function updatePreloaderProgress() {
+    setLoadingPercent(getCombinedProgress() * 100);
+  }
+
+  function reportModelProgress(loaded, total) {
+    preloaderState.modelProgress = loaded;
+    preloaderState.modelTotal = total || preloaderState.modelTotal;
+    updatePreloaderProgress();
+  }
+
+  function markModelLoaded() {
+    preloaderState.modelLoaded = true;
+    if (!preloaderState.modelTotal) preloaderState.modelTotal = preloaderState.modelProgress || 1;
+    updatePreloaderProgress();
+    tryFinishPreloader();
+  }
+
+  function markWindowLoaded() {
+    preloaderState.windowLoaded = true;
+    updatePreloaderProgress();
+    tryFinishPreloader();
+  }
+
+  function tryFinishPreloader() {
+    if (finished) return;
+    if (preloaderState.windowLoaded && preloaderState.modelLoaded) {
+      setTimeout(finishPreloader, 300);
+    }
+  }
+
+  if (typeof window !== 'undefined') {
+    window.preloader = window.preloader || {};
+    const queued = Array.isArray(window.preloader._queue) ? window.preloader._queue.slice() : [];
+    window.preloader.reportModelProgress = reportModelProgress;
+    window.preloader.markModelLoaded = markModelLoaded;
+    window.preloader.markWindowLoaded = markWindowLoaded;
+    if (queued.length > 0) {
+      window.preloader._queue = [];
+      queued.forEach((item) => {
+        const [name, ...args] = item;
+        if (typeof window.preloader[name] === 'function') {
+          window.preloader[name](...args);
+        }
+      });
     }
   }
 
   function animateProgress() {
     if (finished) return;
-    const now = Date.now();
-    const elapsed = now - startTime;
-    let percent = Math.min(100, (elapsed / DELAY_MS) * 100);
-    setLoadingPercent(percent);
-    if (elapsed < DELAY_MS) {
-      animationFrame = requestAnimationFrame(animateProgress);
+    if (displayedPercent < targetPercent) {
+      displayedPercent += 1;
+      renderPercent(displayedPercent);
     }
+    animationFrame = requestAnimationFrame(animateProgress);
   }
 
   function finishPreloader() {
+    if (finished) return;
     finished = true;
-      const mainSection = document.getElementById('main-section');
-      if (mainSection) {
-        mainSection.classList.remove('visible');
-        mainSection.style.opacity = '0';
-      }
-      if (onComplete) {
-        // onComplete может быть async, ждем его завершения
-        Promise.resolve(onComplete()).then(() => {
-          setTimeout(() => {
-            hideLoading();
-          }, 300);
-        });
-      }
-  }
-
-  function stepLoaded() {
-    loadedSteps++;
-    if (loadedSteps >= TOTAL_STEPS) {
-      // Если загрузка завершилась раньше времени — добиваем прогресс до 100% за оставшееся время
-      const now = Date.now();
-      const elapsed = now - startTime;
-      const left = Math.max(0, DELAY_MS - elapsed);
-      setTimeout(finishPreloader, left);
+    if (animationFrame) cancelAnimationFrame(animationFrame);
+    targetPercent = 99;
+    displayedPercent = 99;
+    renderPercent(99);
+    const mainSection = document.getElementById('main-section');
+    if (mainSection) {
+      mainSection.classList.remove('visible');
+      mainSection.style.opacity = '0';
+    }
+    if (onComplete) {
+      Promise.resolve(onComplete()).then(() => {
+        setTimeout(() => {
+          hideLoading();
+        }, 300);
+      });
+    } else {
+      setTimeout(() => {
+        hideLoading();
+      }, 300);
     }
   }
 
@@ -118,6 +182,11 @@ export function runPreloader({ onComplete }) {
       
       if (soundBtn) {
         soundBtn.onclick = () => {
+          if (soundBtnClicked) return;
+          soundBtnClicked = true;
+          soundBtn.disabled = true;
+          soundBtn.classList.add('disabled');
+
           // Play background music (user gesture allows autoplay)
           try {
             // play chelk once and a looping background music2
@@ -309,21 +378,24 @@ export function runPreloader({ onComplete }) {
       }
       if (musicToggleBtn) {
         musicToggleBtn.onclick = () => {
+          try {
+            const chelkAudio = new Audio('audio/chelk.mp3');
+            chelkAudio.loop = false;
+            chelkAudio.play().catch((err) => console.warn('chelk playback failed:', err));
+          } catch (e) {
+            console.warn('Failed to play chelk audio:', e);
+          }
+
           const audio = window.bgAudio;
           if (audio && !audio.paused) {
             fadeOutAndStop(audio, 800);
           } else {
             try {
               // same behavior as soundBtn: play chelk once and looping music2 with delay
-              const chelkAudio = new Audio('audio/chelk.mp3');
-              chelkAudio.loop = false;
-              chelkAudio.play().catch((err) => console.warn('chelk playback failed:', err));
-
               const music2 = new Audio('audio/music2.mp3');
               music2.loop = true;
               // expose before starting so other handlers can reference
               window.bgAudio = music2;
-              window.chelkAudio = chelkAudio;
               setTimeout(() => {
                 music2.play().catch((err) => console.warn('music2 playback failed:', err));
               }, 500);
@@ -333,21 +405,41 @@ export function runPreloader({ onComplete }) {
           }
         };
       }
+
+      const phoneLink = document.querySelector('a[href="tel:+79162077558"]');
+      if (phoneLink) {
+        phoneLink.addEventListener('click', () => {
+          try {
+            const chelkAudio = new Audio('audio/chelk.mp3');
+            chelkAudio.loop = false;
+            chelkAudio.play().catch((err) => console.warn('chelk playback failed:', err));
+          } catch (e) {
+            console.warn('Failed to play chelk audio on phone click:', e);
+          }
+        });
+      }
     }, 900);
   }
 
   // Ждем полной загрузки window, затем запускаем анимацию прогресса
   function startPreloader() {
-    startTime = Date.now();
     animateProgress();
-    // Если загрузка не завершилась за DELAY_MS, всё равно завершаем
     setTimeout(() => {
-      if (!finished) finishPreloader();
-    }, DELAY_MS);
+      if (!finished) {
+        preloaderState.windowLoaded = true;
+        preloaderState.modelLoaded = true;
+        finishPreloader();
+      }
+    }, MAX_WAIT_MS);
   }
+
   if (document.readyState === 'complete') {
+    markWindowLoaded();
     startPreloader();
   } else {
-    window.addEventListener('load', startPreloader);
+    window.addEventListener('load', () => {
+      markWindowLoaded();
+      startPreloader();
+    });
   }
 }

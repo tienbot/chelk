@@ -93,12 +93,13 @@ function onWheelScale(e) {
   if (!scrollScaleEnabled) return;
   const inst = threeInstances[currentSlideIndex];
   if (!inst || !inst.modelGroup) return;
-  // set wheel direction and active timeout; actual scaling applied in animateModels per-frame
+  // set wheel direction, magnitude and active timeout; actual scaling applied in animateModels per-frame
   const delta = e.deltaY;
   const dir = Math.sign(delta) || 0;
   const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
   inst._wheelDirection = dir;
   inst._wheelActiveUntil = now + 160;
+  inst._wheelMagnitude = Math.min(8, Math.max(1, Math.abs(delta) * 0.02));
   return;
 
   // If scrolling out (delta<0) and camera is closer than base distance, move camera back first
@@ -958,6 +959,7 @@ async function initThreeForSlide(slideElement, modelConfig, slideIndex) {
     modelConfig,
     darknessAccumulator: 0,
     _wheelDirection: 0,
+    _wheelMagnitude: 1,
     _wheelActiveUntil: 0,
     _animatePrevTime: (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now(),
   };
@@ -1008,7 +1010,7 @@ async function initThreeForSlide(slideElement, modelConfig, slideIndex) {
       const activeUntil = instance._wheelActiveUntil || 0;
       if (dir !== 0 && now < activeUntil && instance.modelGroup && slideElement.classList.contains('center')) {
         const cur = instance.modelGroup.scale.x || 1;
-        const change = dir * SCALE_RATE * dt * CENTER_SCROLL_MULTIPLIER;
+        const change = dir * SCALE_RATE * dt * CENTER_SCROLL_MULTIPLIER * (instance._wheelMagnitude || 1);
         const next = clamp(cur + change, MIN_MODEL_SCALE, MAX_MODEL_SCALE);
         // always attempt to scale model to keep constant perceived speed
         try {
@@ -1051,8 +1053,9 @@ async function initThreeForSlide(slideElement, modelConfig, slideIndex) {
           }
         } catch (e) {}
       } else {
-        // clear direction if inactive
+        // clear direction and magnitude if inactive
         if (instance._wheelDirection !== 0) instance._wheelDirection = 0;
+        instance._wheelMagnitude = 1;
       }
     } catch (e) {}
 
@@ -1074,6 +1077,7 @@ function updateSlidePositions() {
     else if (idx === centerIndex) slide.classList.add('center');
     else slide.classList.add('right');
   });
+  const shouldPlaySound = typeof updateSlidePositions._prevSlideIndex === 'number' && updateSlidePositions._prevSlideIndex !== currentSlideIndex;
   threeInstances.forEach((inst, idx) => {
     const slideEl = slidesArray[idx];
     // If renderer exists, resize it to match the current slide size (important when a slide becomes center/fullscreen)
@@ -1128,6 +1132,11 @@ function updateSlidePositions() {
     if (i === currentSlideIndex) dot.classList.add('active');
     else dot.classList.remove('active');
   });
+
+  if (shouldPlaySound) {
+    playChelkSound();
+  }
+  updateSlidePositions._prevSlideIndex = currentSlideIndex;
 }
 
 // ========== ГЛАВНАЯ СИНХРОННАЯ СМЕНА ==========
@@ -1143,18 +1152,33 @@ async function syncChangeSlide(newSlideIndex) {
   currentSlideIndex = newSlideIndex;
   updateSlidePositions();
 
-  await textPromise;
-  setTimeout(() => {
+  try {
+    await textPromise;
+  } finally {
     isTransitioning = false;
-  }, 50);
+  }
+}
+
+function playChelkSound() {
+  try {
+    const chelkAudio = new Audio('audio/chelk.mp3');
+    chelkAudio.loop = false;
+    chelkAudio.play().catch((err) => console.warn('chelk playback failed:', err));
+  } catch (e) {
+    console.warn('Failed to play chelk audio:', e);
+  }
 }
 
 function nextSlide() {
-  if (!isTransitioning) syncChangeSlide((currentSlideIndex + 1) % 3);
+  if (!isTransitioning) {
+    syncChangeSlide((currentSlideIndex + 1) % 3);
+  }
 }
 
 function prevSlide() {
-  if (!isTransitioning) syncChangeSlide((currentSlideIndex - 1 + 3) % 3);
+  if (!isTransitioning) {
+    syncChangeSlide((currentSlideIndex - 1 + 3) % 3);
+  }
 }
 
 function setupDragAndDrop() {

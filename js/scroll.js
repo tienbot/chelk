@@ -14,10 +14,27 @@ let ticking = false
 let videoActivated = false
 // timeout id for hiding the scroll-section after fade
 let hideScrollSectionTimeout = null
+// timer to restore slide transitions after scroll stops
+let slideTransformRestoreTimer = null
 
 function updateFrames(top){
     const delta = lastPos - top
     lastPos = top
+    // During active scroll, disable CSS transitions on the center slide so its
+    // transform/scale updates apply immediately (prevents lag vs frames).
+    try {
+        const sc = document.querySelector('.slide.center')
+        if (sc) {
+            // only touch inline style if not already disabled
+            if (sc._savedTransition === undefined) sc._savedTransition = sc.style.transition || ''
+            sc.style.transition = 'none'
+            if (slideTransformRestoreTimer) clearTimeout(slideTransformRestoreTimer)
+            slideTransformRestoreTimer = setTimeout(() => {
+                try { sc.style.transition = sc._savedTransition || '' } catch (e) {}
+                slideTransformRestoreTimer = null
+            }, 120)
+        }
+    } catch (e) {}
     let maxOpacity = 0
     frames.forEach(function(frame, i){
         if (zVals[i] === undefined) zVals[i] = (i * zSpacing) + zSpacing
@@ -81,8 +98,26 @@ function updateFrames(top){
     try {
         const headSection = document.querySelector('.head')
         if (headSection) {
-            if (centerIsTinyZero) headSection.classList.add('visible')
-            else headSection.classList.remove('visible')
+            if (top === 0) {
+                headSection.classList.remove('visible')
+            } else if (centerIsTinyZero) {
+                headSection.classList.add('visible')
+            } else {
+                headSection.classList.remove('visible')
+            }
+            // Toggle `.lines` visibility opposite to `head`, but only after user has enabled lines (choiseBtn click)
+            try {
+                if (window._linesEnabled && !window.bubbleClick) {
+                    const linesEl = document.querySelector('.lines') || document.querySelector('section.lines') || document.getElementById('lines')
+                    if (linesEl) {
+                        if (headSection.classList.contains('visible')) {
+                            linesEl.classList.remove('visible')
+                        } else {
+                            linesEl.classList.add('visible')
+                        }
+                    }
+                }
+            } catch (e) {}
         }
     } catch(e) {}
 

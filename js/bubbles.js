@@ -1,4 +1,6 @@
 const container = document.querySelector('.bubbles-container')
+// global flag: becomes true on the first bubble click
+if (typeof window !== 'undefined' && typeof window.bubbleClick === 'undefined') window.bubbleClick = false
 // store placed rectangles to avoid overlaps
 const placedRects = []
 
@@ -103,6 +105,10 @@ const itemsPurple = [
 
 // NOTE: initial bubbles removed — page starts empty.
 // Helper: find non-overlapping random position for a bubble and register its rect
+function buildBubbleTextHtml(mainHtml, label) {
+  return `<p class="bubble-label">${label}</p>${mainHtml}`
+}
+
 function placeNonOverlapping(bubble) {
   const cRect = container.getBoundingClientRect()
   const bRect = bubble.getBoundingClientRect()
@@ -148,12 +154,39 @@ function placeNonOverlapping(bubble) {
   return { left: parseInt(bubble.style.left, 10), top: parseInt(bubble.style.top, 10) }
 }
 
+function playBubblePopSound() {
+  try {
+    const file = Math.random() < 0.5 ? 'audio/pop1.mp3' : 'audio/pop2.mp3'
+    const audio = new Audio(file)
+    audio.loop = false
+    audio.play().catch((err) => console.warn('Bubble pop playback failed:', err))
+  } catch (err) {
+    console.warn('Failed to play bubble pop sound:', err)
+  }
+}
+
 function attachBehavior(bubble, item) {
   const inner = bubble.querySelector('.bubble-inner')
   const textElement = bubble.querySelector('.bubble-text')
+  const gameSection = document.querySelector('.game')
   let timeoutId = null
   let showingAlt = false // is text2 currently shown
   let swapTimeout = null
+
+  function isGameActive() {
+    if (!gameSection) return false
+    const style = window.getComputedStyle(gameSection)
+    return style.visibility !== 'hidden' && style.opacity !== '0'
+  }
+
+  function updateCursor() {
+    bubble.style.cursor = isGameActive() ? 'default' : 'pointer'
+  }
+
+  function hideBubbleText() {
+    textElement.style.transition = 'opacity 0.18s ease'
+    textElement.style.opacity = '0'
+  }
 
   function startRandomShake() {
     const delay = 2000 + Math.random() * 5000
@@ -167,8 +200,14 @@ function attachBehavior(bubble, item) {
   }
 
   startRandomShake()
+  updateCursor()
 
   inner.addEventListener('mouseenter', () => {
+    updateCursor()
+    if (isGameActive()) {
+      hideBubbleText()
+      return
+    }
     if (timeoutId) clearTimeout(timeoutId)
     inner.classList.remove('shake')
 
@@ -192,6 +231,11 @@ function attachBehavior(bubble, item) {
   })
 
   inner.addEventListener('mouseleave', () => {
+    if (isGameActive()) {
+      updateCursor()
+      hideBubbleText()
+      return
+    }
     // Resume float: re-enable animation and remove inline transform
     bubble.style.animation = ''
     bubble.style.animationPlayState = 'running'
@@ -205,24 +249,32 @@ function attachBehavior(bubble, item) {
       clearTimeout(swapTimeout)
       swapTimeout = null
     }
-    textElement.style.transition = 'opacity 0.35s ease'
+    textElement.style.transition = 'opacity 0.18s ease'
     textElement.style.opacity = '0'
 
     // if alternate text is showing, revert its content to text1 (kept hidden)
     if (showingAlt) {
       // swap content but keep hidden; when user re-enters, CSS will show current content
-      swapText(item.text1)
+      swapText(item.text1, '✦ клиент ✦')
       showingAlt = false
     }
   })
 
-  function swapText(newHtml) {
+  function swapText(newHtml, label) {
+    if (isGameActive()) {
+      hideBubbleText()
+      return
+    }
     clearTimeout(swapTimeout)
-    textElement.style.transition = 'opacity 0.6s ease'
+    textElement.style.transition = 'opacity 0.18s ease'
     // fade out first
     textElement.style.opacity = '0'
     swapTimeout = setTimeout(() => {
-      textElement.innerHTML = newHtml
+      if (isGameActive()) {
+        hideBubbleText()
+        return
+      }
+      textElement.innerHTML = buildBubbleTextHtml(newHtml, label)
       void textElement.offsetWidth
       // if currently hovered, remove inline opacity so CSS :hover makes it visible;
       // otherwise keep it hidden (opacity 0)
@@ -231,23 +283,46 @@ function attachBehavior(bubble, item) {
       } else {
         textElement.style.opacity = '0'
       }
-    }, 650)
+    }, 200)
   }
 
   inner.addEventListener('click', () => {
+    playBubblePopSound()
+    if (isGameActive()) {
+      updateCursor()
+      hideBubbleText()
+      return
+    }
+    // On click set the global flags, enable page scrolling, and allow head fade on scroll.
+    try {
+      if (typeof window !== 'undefined') {
+        window.bubbleClick = true
+        window.bubblesActive = true
+        console.log('bubbleClick:', true, '(bubble click)')
+      }
+      const scrollSection = document.querySelector('.scroll-section')
+      if (scrollSection) {
+        scrollSection.classList.remove('visible')
+      }
+      const carousel = document.querySelector('.carousel')
+      if (carousel) {
+        carousel.style.setProperty('display', 'none', 'important')
+      }
+    } catch (e) {}
+
     // toggle between text1 and text2 with symmetric animation
     if (!showingAlt) {
-      swapText(item.text2)
+      swapText(item.text2, '✦ агентство ✦')
       showingAlt = true
     } else {
-      swapText(item.text1)
+      swapText(item.text1, '✦ клиент ✦')
       showingAlt = false
     }
   })
 }
 
 // Вынесенная функция: спавнит один пузырь по дуге из кнопки
-function spawnBubble(item, fixedTarget) {
+function spawnBubble(item, fixedTarget, sourcePoint) {
   const bubble = document.createElement('div')
   bubble.className = 'bubble'
   bubble.style.setProperty('--bubble-color', item.color)
@@ -270,10 +345,17 @@ function spawnBubble(item, fixedTarget) {
   requestAnimationFrame(() => {
     const cRect = container.getBoundingClientRect()
     const bRect = bubble.getBoundingClientRect()
-    const btnRect = document.querySelector('.bubbles-btn').getBoundingClientRect()
+    const btn = document.querySelector('.bubbles-btn')
 
-    const startLeft = Math.round(btnRect.left - cRect.left + btnRect.width / 2 - bRect.width / 2)
-    const startTop = Math.round(btnRect.top - cRect.top + btnRect.height / 2 - bRect.height / 2)
+    const buttonCenterX = btn
+      ? Math.round(btn.getBoundingClientRect().left - cRect.left + btn.getBoundingClientRect().width / 2)
+      : Math.round(cRect.width * 0.5)
+    const buttonCenterY = btn
+      ? Math.round(btn.getBoundingClientRect().top - cRect.top + btn.getBoundingClientRect().height / 2)
+      : Math.round(cRect.height * 0.37)
+
+    const startLeft = Math.round(buttonCenterX - bRect.width / 2)
+    const startTop = Math.round(buttonCenterY - bRect.height / 2)
 
     const maxLeft = Math.max(0, cRect.width - bRect.width)
     const maxTop = Math.max(0, cRect.height - bRect.height)
@@ -351,7 +433,7 @@ function spawnBubble(item, fixedTarget) {
       bubble.classList.remove('spawning')
 
       const textElement = bubble.querySelector('.bubble-text')
-      textElement.innerHTML = item.text1
+      textElement.innerHTML = buildBubbleTextHtml(item.text1, '✦ клиент ✦')
 
       attachBehavior(bubble, item)
     }
@@ -360,6 +442,108 @@ function spawnBubble(item, fixedTarget) {
 
 const spawnBtn = document.querySelector('.bubbles-btn')
 let spawnLocked = false // prevent multiple rapid clicks
+
+function triggerBubbleSpawn({ triggeredBy, sourcePoint } = {}) {
+  if (triggeredBy !== 'head' && triggeredBy !== 'button') return
+  if (spawnLocked) return
+  spawnLocked = true
+  if (spawnBtn) spawnBtn.disabled = true
+
+  const existing = Array.from(container.querySelectorAll('.bubble'))
+  if (existing.length === 0) {
+    let activeMain = null
+    try {
+      const el = document.getElementById('mainObject')
+      if (el && el.textContent) activeMain = String(el.textContent).trim()
+    } catch (e) {}
+    try { if (!activeMain && typeof window !== 'undefined' && window.mainObject) activeMain = String(window.mainObject); } catch (e) {}
+
+    let forcedGroup = null
+    const nm = (activeMain || '').toLowerCase()
+    if (nm === 'хорека') forcedGroup = itemsRed
+    else if (nm === 'одежда') forcedGroup = itemsGreen
+    else if (nm === 'косметика') forcedGroup = itemsPurple
+
+    if (forcedGroup) console.log('[bubbles] forced group by mainObject:', activeMain)
+    spawnThreeWithStagger(() => {
+      spawnLocked = false
+      if (spawnBtn) spawnBtn.disabled = false
+    }, forcedGroup, sourcePoint)
+    return
+  }
+
+  const fallDuration = 2000 // ms for translate (shorter, smoother)
+  const fadeBefore = 300 // ms before end to start fade
+  existing.forEach((b) => {
+    b.style.animation = 'none'
+    b.style.animationPlayState = 'paused'
+
+    const cs = getComputedStyle(b)
+    const startTransform = cs.transform && cs.transform !== 'none' ? cs.transform : 'translate3d(0px,0px,0px)'
+    const fallPx = Math.round(window.innerHeight * 1.2)
+    const endTransform = startTransform + ` translate3d(0px, ${fallPx}px, 0)`
+
+    try {
+      const anim = b.animate([{ transform: startTransform }, { transform: endTransform }], {
+        duration: fallDuration,
+        easing: 'ease-in-out',
+        fill: 'forwards',
+      })
+      setTimeout(
+        () => {
+          b.style.opacity = '0'
+        },
+        Math.max(0, fallDuration - fadeBefore),
+      )
+      anim.onfinish = () => {
+        b.style.transform = endTransform
+      }
+    } catch (e) {
+      let tx = 0,
+        ty = 0
+      try {
+        const m = new DOMMatrixReadOnly(startTransform)
+        tx = m.m41 || 0
+        ty = m.m42 || 0
+      } catch (er) {}
+      b.style.transform = `translate3d(${tx}px, ${ty}px, 0)`
+      b.style.transition = `transform ${fallDuration}ms ease-in, opacity 600ms linear`
+      void b.offsetWidth
+      b.style.transform = `translate3d(${tx}px, ${ty + fallPx}px, 0)`
+      setTimeout(
+        () => {
+          b.style.opacity = '0'
+        },
+        Math.max(0, fallDuration - fadeBefore),
+      )
+    }
+  })
+
+  const fallWait = fallDuration + 80 // small buffer after fade
+  setTimeout(() => {
+    existing.forEach(removeBubbleImmediate)
+    let activeMain2 = null
+    try {
+      const el2 = document.getElementById('mainObject')
+      if (el2 && el2.textContent) activeMain2 = String(el2.textContent).trim()
+    } catch (e) {}
+    try { if (!activeMain2 && typeof window !== 'undefined' && window.mainObject) activeMain2 = String(window.mainObject); } catch (e) {}
+    let forcedGroup2 = null
+    const nm2 = (activeMain2 || '').toLowerCase()
+    if (nm2 === 'хорека') forcedGroup2 = itemsRed
+    else if (nm2 === 'одежда') forcedGroup2 = itemsGreen
+    else if (nm2 === 'косметика') forcedGroup2 = itemsPurple
+    if (forcedGroup2) console.log('[bubbles] forced group by mainObject (after fall):', activeMain2)
+
+    spawnThreeWithStagger(() => {
+      spawnLocked = false
+      if (spawnBtn) spawnBtn.disabled = false
+    }, forcedGroup2, sourcePoint)
+  }, fallWait)
+}
+
+window.triggerBubbleSpawn = triggerBubbleSpawn
+
 // helper: try to remove the placedRects entry for a bubble
 function removePlacedRectForBubble(bubble) {
   const left = parseInt(bubble.style.left || 0, 10)
@@ -378,13 +562,13 @@ function removeBubbleImmediate(bubble) {
   if (bubble.parentNode) bubble.parentNode.removeChild(bubble)
 }
 
-function spawnThreeWithStagger(done, forcedGroup) {
+function spawnThreeWithStagger(done, forcedGroup, sourcePoint) {
   const stagger = 220 // ms between spawns
   // fixed relative target positions for the three bubbles (fractions of available area)
   const fixedTargets = [
     { fx: 0.9, fy: 0.56 },
     { fx: 0.12, fy: 0.78 },
-    { fx: 0.74, fy: 0.1 },
+    { fx: 0.74, fy: 0.2 },
   ]
 
   const groups = [itemsGreen, itemsRed, itemsPurple]
@@ -447,7 +631,7 @@ function spawnThreeWithStagger(done, forcedGroup) {
   // finally spawn the three picked items in order with stagger
   for (let i = 0; i < 3; i++) {
     setTimeout(() => {
-      spawnBubble(picks[i], fixedTargets[i])
+      spawnBubble(picks[i], fixedTargets[i], sourcePoint)
     }, i * stagger)
   }
 
@@ -457,112 +641,3 @@ function spawnThreeWithStagger(done, forcedGroup) {
   }
 }
 
-if (spawnBtn) {
-  spawnBtn.addEventListener('click', () => {
-    if (spawnLocked) return
-    spawnLocked = true
-    spawnBtn.disabled = true
-
-    const existing = Array.from(container.querySelectorAll('.bubble'))
-    if (existing.length === 0) {
-      // determine active mainObject from DOM or global fallback and normalize
-      let activeMain = null
-      try {
-        const el = document.getElementById('mainObject')
-        if (el && el.textContent) activeMain = String(el.textContent).trim()
-      } catch (e) {}
-      try { if (!activeMain && typeof window !== 'undefined' && window.mainObject) activeMain = String(window.mainObject); } catch (e) {}
-
-      let forcedGroup = null
-      const nm = (activeMain || '').toLowerCase()
-      if (nm === 'хорека') forcedGroup = itemsRed
-      else if (nm === 'одежда') forcedGroup = itemsGreen
-      else if (nm === 'косметика') forcedGroup = itemsPurple
-
-      if (forcedGroup) console.log('[bubbles] forced group by mainObject:', activeMain)
-      spawnThreeWithStagger(() => {
-        spawnLocked = false
-        spawnBtn.disabled = false
-      }, forcedGroup)
-      return
-    }
-
-    // trigger fall for all existing bubbles with a smoother motion and shorter fade
-    const fallDuration = 2000 // ms for translate (shorter, smoother)
-    const fadeBefore = 300 // ms before end to start fade
-    existing.forEach((b) => {
-      // stop float animation so computed transform is stable
-      b.style.animation = 'none'
-      b.style.animationPlayState = 'paused'
-
-      // read current computed transform (may be a matrix or translate)
-      const cs = getComputedStyle(b)
-      const startTransform = cs.transform && cs.transform !== 'none' ? cs.transform : 'translate3d(0px,0px,0px)'
-      const fallPx = Math.round(window.innerHeight * 1.2)
-      const endTransform = startTransform + ` translate3d(0px, ${fallPx}px, 0)`
-
-      // animate transform via WAAPI to preserve current X component
-      try {
-        const anim = b.animate([{ transform: startTransform }, { transform: endTransform }], {
-          duration: fallDuration,
-          easing: 'ease-in-out',
-          fill: 'forwards',
-        })
-        // also schedule opacity fade near the end
-        setTimeout(
-          () => {
-            b.style.opacity = '0'
-          },
-          Math.max(0, fallDuration - fadeBefore),
-        )
-        anim.onfinish = () => {
-          // ensure final transform stays applied
-          b.style.transform = endTransform
-        }
-      } catch (e) {
-        // fallback: apply inline transform transition
-        let tx = 0,
-          ty = 0
-        try {
-          const m = new DOMMatrixReadOnly(startTransform)
-          tx = m.m41 || 0
-          ty = m.m42 || 0
-        } catch (er) {}
-        b.style.transform = `translate3d(${tx}px, ${ty}px, 0)`
-        b.style.transition = `transform ${fallDuration}ms ease-in, opacity 600ms linear`
-        void b.offsetWidth
-        b.style.transform = `translate3d(${tx}px, ${ty + fallPx}px, 0)`
-        setTimeout(
-          () => {
-            b.style.opacity = '0'
-          },
-          Math.max(0, fallDuration - fadeBefore),
-        )
-      }
-    })
-
-    // wait for the fall + fade to finish, then remove DOM nodes and spawn new bubbles
-    const fallWait = fallDuration + 80 // small buffer after fade
-    setTimeout(() => {
-      existing.forEach(removeBubbleImmediate)
-      // determine active mainObject for next spawn (normalized)
-      let activeMain2 = null
-      try {
-        const el2 = document.getElementById('mainObject')
-        if (el2 && el2.textContent) activeMain2 = String(el2.textContent).trim()
-      } catch (e) {}
-      try { if (!activeMain2 && typeof window !== 'undefined' && window.mainObject) activeMain2 = String(window.mainObject); } catch (e) {}
-      let forcedGroup2 = null
-      const nm2 = (activeMain2 || '').toLowerCase()
-      if (nm2 === 'хорека') forcedGroup2 = itemsRed
-      else if (nm2 === 'одежда') forcedGroup2 = itemsGreen
-      else if (nm2 === 'косметика') forcedGroup2 = itemsPurple
-      if (forcedGroup2) console.log('[bubbles] forced group by mainObject (after fall):', activeMain2)
-
-      spawnThreeWithStagger(() => {
-        spawnLocked = false
-        spawnBtn.disabled = false
-      }, forcedGroup2)
-    }, fallWait)
-  })
-}
