@@ -14,9 +14,32 @@ function getSelectedColorVariant() {
 let selectedColorVariant = getSelectedColorVariant()
 const lottiePatternElement = document.querySelector('.lottie-pattern')
 const popSoundPaths = ['./audio/pop1.mp3', './audio/pop2.mp3']
+const preloadedAudio = {
+  chelk: new Audio('audio/chelk.mp3'),
+  pop1: new Audio('audio/pop1.mp3'),
+  pop2: new Audio('audio/pop2.mp3'),
+};
+Object.values(preloadedAudio).forEach((audio) => {
+  audio.preload = 'auto'
+  audio.load()
+})
+
+function getPreloadedAudio(url) {
+  const cached = Object.values(preloadedAudio).find((audio) => audio.src.endsWith(url))
+  if (cached) {
+    try {
+      const clone = cached.cloneNode(true)
+      clone.preload = 'auto'
+      return clone
+    } catch (e) {
+      return new Audio(url)
+    }
+  }
+  return new Audio(url)
+}
 
 function playPopSound() {
-  const sound = new Audio(popSoundPaths[Math.floor(Math.random() * popSoundPaths.length)])
+  const sound = getPreloadedAudio(popSoundPaths[Math.floor(Math.random() * popSoundPaths.length)])
   sound.volume = 0.6
   sound.play().catch(() => {})
 }
@@ -90,8 +113,9 @@ if (btnRequest) {
 
 function playCheklSound() {
   try {
-    const audio = new Audio('audio/chelk.mp3')
+    const audio = getPreloadedAudio('audio/chelk.mp3')
     audio.volume = 0.9
+    audio.currentTime = 0
     audio.play().catch(() => {})
   } catch (e) {
     // ignore playback errors
@@ -322,7 +346,7 @@ function getLottiePathForColor(color) {
 }
 
 function preloadAudioFiles() {
-  const audioUrls = ['audio/chelk.mp3', 'audio/music2.mp3'];
+  const audioUrls = ['audio/chelk.mp3', 'audio/music.mp3'];
   return Promise.all(
     audioUrls.map((url) =>
       fetch(url, { cache: 'force-cache' })
@@ -337,6 +361,8 @@ function preloadAudioFiles() {
   );
 }
 
+const cachedLottieJson = {}
+
 function preloadLottieResources() {
   const lottieSources = ['./other/red.json', './other/purple.json', './other/green.json'];
   const jsonPreload = Promise.all(
@@ -345,6 +371,10 @@ function preloadLottieResources() {
         .then((response) => {
           if (!response.ok) throw new Error(`Failed to preload Lottie JSON: ${url}`);
           return response.json();
+        })
+        .then((json) => {
+          if (json) cachedLottieJson[url] = json;
+          return json;
         })
         .catch((error) => {
           console.warn('Lottie JSON preload failed:', url, error);
@@ -388,16 +418,21 @@ function playLottieAnimation(path) {
   }
   loadLottieLib()
     .then((lottie) => {
-      lottieAnimation = lottie.loadAnimation({
+      const animationOptions = {
         container: lottieContainerEl,
         renderer: 'svg',
         loop: false,
         autoplay: false,
-        path,
         rendererSettings: {
           preserveAspectRatio: 'xMidYMid slice',
         },
-      })
+      }
+      if (cachedLottieJson[path]) {
+        animationOptions.animationData = cachedLottieJson[path]
+      } else {
+        animationOptions.path = path
+      }
+      lottieAnimation = lottie.loadAnimation(animationOptions)
 
       const updateFrame = () => {
         if (!lottieAnimation) return

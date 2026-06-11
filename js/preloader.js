@@ -1,5 +1,13 @@
 // Прелоадер: логика и экспорт функции запуска
 let preloaderHasRun = false;
+const soundAudioCache = {
+  chelk: new Audio('audio/chelk.mp3'),
+  music: new Audio('audio/music.mp3'),
+};
+Object.values(soundAudioCache).forEach((audio) => {
+  audio.preload = 'auto';
+  audio.load();
+});
 
 export function runPreloader({ onComplete }) {
   const loadingSection = document.querySelector('section.loading');
@@ -209,17 +217,19 @@ export function runPreloader({ onComplete }) {
 
           // Play background music (user gesture allows autoplay)
           try {
-            // play chelk once and a looping background music2
-            const chelkAudio = new Audio('audio/chelk.mp3');
+            // play chelk once and a looping background music
+            const chelkAudio = soundAudioCache.chelk;
             chelkAudio.loop = false;
+            chelkAudio.currentTime = 0;
             chelkAudio.play().catch((err) => console.warn('chelk playback failed:', err));
 
-            const music2 = new Audio('audio/music2.mp3');
-            music2.loop = true;
+            const music = soundAudioCache.music;
+            music.loop = true;
+            music.currentTime = 0;
             // small startup delay so playback begins 0.1s after click
-            window.bgAudio = music2;
+            window.bgAudio = music;
             setTimeout(() => {
-              music2.play().catch((err) => console.warn('music2 playback failed:', err));
+              music.play().catch((err) => console.warn('music playback failed:', err));
             }, 500);
 
             // expose for debugging/control: bgAudio refers to looping music
@@ -416,13 +426,13 @@ export function runPreloader({ onComplete }) {
             fadeOutAndStop(audio, 800);
           } else {
             try {
-              // same behavior as soundBtn: play chelk once and looping music2 with delay
-              const music2 = new Audio('audio/music2.mp3');
-              music2.loop = true;
+              // same behavior as soundBtn: play chelk once and looping music with delay
+              const music = new Audio('audio/music.mp3');
+              music.loop = true;
               // expose before starting so other handlers can reference
-              window.bgAudio = music2;
+              window.bgAudio = music;
               setTimeout(() => {
-                music2.play().catch((err) => console.warn('music2 playback failed:', err));
+                music.play().catch((err) => console.warn('music playback failed:', err));
               }, 500);
             } catch (e) {
               console.warn('Failed to start music:', e);
