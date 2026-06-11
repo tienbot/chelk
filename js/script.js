@@ -11,6 +11,26 @@ const MODELS_CONFIG = [
   { name: 'Косметика', scale: BASE_SCALE, activeScale: BASE_SCALE * 1.05, file: 'cosmetic-black.glb' },
 ];
 
+function preloadCarouselModelFiles() {
+  const urls = MODELS_CONFIG.map((item) => `./models/${item.file}`);
+  return Promise.all(
+    urls.map((url) =>
+      fetch(url, { cache: 'force-cache' })
+        .then((response) => {
+          if (!response.ok) throw new Error(`Failed to preload ${url}`);
+          return response.arrayBuffer();
+        })
+        .catch((error) => {
+          console.warn('Carousel model preload failed:', url, error);
+        }),
+    ),
+  );
+}
+
+if (typeof window !== 'undefined' && window.preloader && typeof window.preloader.addWaitTask === 'function') {
+  window.preloader.addWaitTask(preloadCarouselModelFiles());
+}
+
 let slidesArray = [];
 let threeInstances = [];
 let currentSlideIndex = 1;
@@ -1324,9 +1344,12 @@ async function buildCarousel() {
 // ========== УПРАВЛЕНИЕ С КЛАВИАТУРЫ ==========
 function initKeyboardControls() {
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowLeft') prevSlide();
-    else if (e.key === 'ArrowRight') nextSlide();
-  });
+    const choiseBtn = document.getElementById('choiseBtn')
+    if (!choiseBtn || !choiseBtn.classList.contains('visible')) return
+
+    if (e.key === 'ArrowLeft') prevSlide()
+    else if (e.key === 'ArrowRight') nextSlide()
+  })
 }
 
 

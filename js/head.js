@@ -568,6 +568,37 @@ function initHeadScrollFade() {
       window._lastHeadTouchY = null;
     }
 
+    window.resetHeadScrollFade = function() {
+      headPermanentlyHidden = false;
+      fadeWheel = 0;
+      clearHeadHideTimeout();
+      if (headSection) {
+        headSection.style.display = 'flex';
+        headSection.classList.remove('head-hidden-permanent');
+        headSection.classList.add('visible');
+        headSection.style.opacity = '1';
+        headSection.style.pointerEvents = 'auto';
+        headSection.style.visibility = 'visible';
+      }
+      if (carouselTrack) {
+        carouselTrack.style.opacity = '';
+        carouselTrack.style.pointerEvents = '';
+        carouselTrack.style.visibility = '';
+      }
+      if (gameSection) {
+        gameSection.style.opacity = '0';
+        gameSection.style.pointerEvents = 'none';
+        gameSection.style.visibility = 'hidden';
+      }
+      if (linesEl) {
+        linesEl.classList.add('visible');
+      }
+      if (scrollSection) {
+        scrollSection.classList.add('visible');
+        scrollSection.style.display = '';
+      }
+    }
+
     function onScroll() {
       if (!shouldRunFade()) return;
       const top = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;

@@ -71,7 +71,6 @@
     </button>
     <p id="soundDescr" class="sound-descr">✦ алхимия любит тишину, но рождается по щёлчком ✦</p>
   </div>
-
   <section id="main-section">
     <header id="header" class="header">
       <div class="container">
@@ -218,7 +217,6 @@
       </p>
     </button>
   </section>
-
   <section class="scroll-section">
     <div class="frame">
       <div class="frame__content text-left">
@@ -434,7 +432,6 @@
       </div>
     </div>
   </section>
-
   <section class="head">
     <div class="viewer-container">
       <canvas id="canvas"></canvas>
@@ -448,10 +445,7 @@
       <div class="bubbles-container"></div>
     </div>
   </section>
-  <!-- <section class="game">
-    test
-  </section> -->
-  <div class="game bubbles-container2">
+  <section class="game bubbles-container2">
     <div class="game-text">Лови правильные идеи. Не теряй их. Серые крадут энергию</div>
     <div class="message-panel" id="messagePanel"></div>
     <div class="platform">
@@ -487,36 +481,72 @@
       <div class="game-point"></div>
     </div>
     <span class="point-desc" id="pointsCounter">0 / 7 частей (0% жидкости)</span>
-  </div>
-  <div class="mix-button-wrapper" id="mixWrapper">
-    <button class="mix-btn" id="mixBtn" type="button">Смешать</button>
-  </div>
-  <div id="lottieSection">
+  </section>
+  <section class="mix-button-wrapper" id="mixWrapper">
+    <button class="mix-btn" id="mixBtn" type="button">
+      <svg width="9" height="42" viewBox="0 0 9 42" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path
+          d="M0 20.842C0 16.8777 0.723044 13.0583 2.16913 9.38382C3.61522 5.70931 5.70825 2.58137 8.4482 0L8.96194 0.47413C7.08457 2.26529 5.63214 5.03763 4.60465 8.79116C3.58985 12.5315 3.08245 16.588 3.08245 20.9605C3.08245 25.3462 3.59619 29.4158 4.62368 33.1693C5.65116 36.9229 7.10994 39.6886 9 41.4666L8.4482 42C5.77167 39.4581 3.69133 36.317 2.20719 32.5767C0.735729 28.8363 0 24.9247 0 20.842ZM9 0.434619V0.533396L8.96194 0.47413L9 0.434619Z"
+          fill="white" fill-opacity="0.5" />
+      </svg>  
+      Смешать
+      <svg width="9" height="42" viewBox="0 0 9 42" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path
+          d="M9 21.158C9 25.1223 8.27696 28.9417 6.83087 32.6162C5.38478 36.2907 3.29175 39.4186 0.551797 42L0.0380555 41.5259C1.91543 39.7347 3.36787 36.9624 4.39535 33.2088C5.41015 29.4685 5.91755 25.412 5.91755 21.0395C5.91755 16.6538 5.40381 12.5842 4.37632 8.83067C3.34884 5.07714 1.89007 2.31138 3.62513e-06 0.533393L0.551801 -7.38565e-07C3.22833 2.54186 5.30867 5.68297 6.79281 9.42333C8.26427 13.1637 9 17.0753 9 21.158ZM3.79956e-08 41.5654L4.6631e-08 41.4666L0.0380555 41.5259L3.79956e-08 41.5654Z"
+          fill="white" fill-opacity="0.5" />
+      </svg>
+    </button>
+  </section>
+  <section id="lottieSection">
     <div class="lottie-section-content">
       <p>Красивое продаётся по щелчку <br>
         Остальное ждёт скидки.</p>
       <div class="lottie-pattern"></div>
     </div>
     <div class="lottie-actions">
-      <button type="button" class="lottie-btn replay-btn">СЫГРАТЬ ЕЩЁ РАЗ</button>
-      <button type="button" class="lottie-btn request-btn">Оставить заявку</button>
+      <button class="mix-btn" id="btnPlayAgain" type="button">
+        <svg width="9" height="42" viewBox="0 0 9 42" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path
+            d="M0 20.842C0 16.8777 0.723044 13.0583 2.16913 9.38382C3.61522 5.70931 5.70825 2.58137 8.4482 0L8.96194 0.47413C7.08457 2.26529 5.63214 5.03763 4.60465 8.79116C3.58985 12.5315 3.08245 16.588 3.08245 20.9605C3.08245 25.3462 3.59619 29.4158 4.62368 33.1693C5.65116 36.9229 7.10994 39.6886 9 41.4666L8.4482 42C5.77167 39.4581 3.69133 36.317 2.20719 32.5767C0.735729 28.8363 0 24.9247 0 20.842ZM9 0.434619V0.533396L8.96194 0.47413L9 0.434619Z"
+            fill="white" fill-opacity="0.5" />
+        </svg>  
+        сыграть еще раз
+        <svg width="9" height="42" viewBox="0 0 9 42" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path
+            d="M9 21.158C9 25.1223 8.27696 28.9417 6.83087 32.6162C5.38478 36.2907 3.29175 39.4186 0.551797 42L0.0380555 41.5259C1.91543 39.7347 3.36787 36.9624 4.39535 33.2088C5.41015 29.4685 5.91755 25.412 5.91755 21.0395C5.91755 16.6538 5.40381 12.5842 4.37632 8.83067C3.34884 5.07714 1.89007 2.31138 3.62513e-06 0.533393L0.551801 -7.38565e-07C3.22833 2.54186 5.30867 5.68297 6.79281 9.42333C8.26427 13.1637 9 17.0753 9 21.158ZM3.79956e-08 41.5654L4.6631e-08 41.4666L0.0380555 41.5259L3.79956e-08 41.5654Z"
+            fill="white" fill-opacity="0.5" />
+        </svg>
+      </button>
+      <button class="mix-btn" id="btnRequest" type="button">
+        <svg width="9" height="42" viewBox="0 0 9 42" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path
+            d="M0 20.842C0 16.8777 0.723044 13.0583 2.16913 9.38382C3.61522 5.70931 5.70825 2.58137 8.4482 0L8.96194 0.47413C7.08457 2.26529 5.63214 5.03763 4.60465 8.79116C3.58985 12.5315 3.08245 16.588 3.08245 20.9605C3.08245 25.3462 3.59619 29.4158 4.62368 33.1693C5.65116 36.9229 7.10994 39.6886 9 41.4666L8.4482 42C5.77167 39.4581 3.69133 36.317 2.20719 32.5767C0.735729 28.8363 0 24.9247 0 20.842ZM9 0.434619V0.533396L8.96194 0.47413L9 0.434619Z"
+            fill="white" fill-opacity="0.5" />
+        </svg>  
+        Оставить заявку
+        <svg width="9" height="42" viewBox="0 0 9 42" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path
+            d="M9 21.158C9 25.1223 8.27696 28.9417 6.83087 32.6162C5.38478 36.2907 3.29175 39.4186 0.551797 42L0.0380555 41.5259C1.91543 39.7347 3.36787 36.9624 4.39535 33.2088C5.41015 29.4685 5.91755 25.412 5.91755 21.0395C5.91755 16.6538 5.40381 12.5842 4.37632 8.83067C3.34884 5.07714 1.89007 2.31138 3.62513e-06 0.533393L0.551801 -7.38565e-07C3.22833 2.54186 5.30867 5.68297 6.79281 9.42333C8.26427 13.1637 9 17.0753 9 21.158ZM3.79956e-08 41.5654L4.6631e-08 41.4666L0.0380555 41.5259L3.79956e-08 41.5654Z"
+            fill="white" fill-opacity="0.5" />
+        </svg>
+      </button>
     </div>
-  </div>
-  <div id="lottieOverlay">
+  </section>
+  <section id="lottieOverlay">
     <div id="lottieScrollArea">
       <div id="lottieContainer"></div>
       <div id="lottieSpacer"></div>
     </div>
-  </div>
+  </section>
 
   <script type="importmap">
-      {
-        "imports": {
-          "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
-          "three/addons/": "https://unpkg.com/three@0.128.0/examples/jsm/"
-        }
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.128.0/examples/jsm/"
       }
-    </script>
+    }
+  </script>
   <script>
     window.preloader = window.preloader || {
       _queue: [],
@@ -529,12 +559,22 @@
       markWindowLoaded: function () {
         this._queue.push(['markWindowLoaded']);
       },
+      addWaitTask: function (promise) {
+        this._queue.push(['addWaitTask', promise]);
+      },
     };
   </script>
   <script type="module">
     import('./js/script.js').then(script => {
       if (script && script.initTextSlides) script.initTextSlides();
       if (script && script.initKeyboardControls) script.initKeyboardControls();
+      if (script && script.buildCarousel) {
+        const buildPromise = script.buildCarousel();
+        if (window.preloader && typeof window.preloader.addWaitTask === 'function') {
+          window.preloader.addWaitTask(buildPromise);
+        }
+        window.carouselBuildPromise = buildPromise;
+      }
     });
     import('./js/preloader.js').then(({ runPreloader }) => {
       runPreloader({ onComplete: () => { } });

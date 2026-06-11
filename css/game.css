@@ -698,7 +698,7 @@ body {
   justify-content: center;
   align-items: center;
   gap: 10px;
-  z-index: 20;
+  /* z-index: 20; */
   opacity: 0;
   pointer-events: none;
   transform: translateY(12px);
@@ -712,27 +712,29 @@ body {
   pointer-events: auto;
 }
 .mix-btn {
+  margin-top: 30px;
   pointer-events: auto;
-  background: #1a1612;
-  border: 1px solid rgba(70, 70, 70, 0.7);
   color: #fff;
   font-size: 14px;
-  font-weight: 400;
-  /* padding: 14px 40px; */
-  border-radius: 80px;
-  backdrop-filter: blur(12px);
-  cursor: pointer;
-  transition: all 0.25s ease;
-  margin-top: 30px;
-}
-.mix-btn:hover {
-  border: 1px solid rgba(255, 255, 255, 0.7);
-}
-.mix-btn.disabled-mix {
+  transition: all 0.6s ease-out;
+  text-transform: uppercase;
   opacity: 0.5;
-  pointer-events: none;
-  filter: grayscale(0.2);
+  width: 123px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
+
+.mix-btn:hover {
+  opacity: 1;
+}
+.mix-btn path {
+  transition: all 0.6s ease-out
+}
+.mix-btn:hover path{
+  fill-opacity: 1;
+}
+
 .fade-out-ui {
   opacity: 0 !important;
   pointer-events: none !important;
@@ -844,6 +846,12 @@ body {
 .lottie-actions{
   position: absolute;
   bottom: 50px;
+  display: flex;
+  gap: 18px;
+}
+
+.lottie-actions .mix-btn{
+  width: 169px;
 }
 
 #lottieSpacer {
@@ -987,6 +995,10 @@ body {
 }
 .points-wrapper .game-point:nth-child(7) {
   opacity: 1;
+}
+
+.game .bubble2{
+  cursor: default;
 }
 
 @media (max-width: 720px) {

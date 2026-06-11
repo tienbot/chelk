@@ -156,8 +156,7 @@ function placeNonOverlapping(bubble) {
 
 function playBubblePopSound() {
   try {
-    const file = Math.random() < 0.5 ? 'audio/pop1.mp3' : 'audio/pop2.mp3'
-    const audio = new Audio(file)
+    const audio = new Audio('audio/chelk.mp3')
     audio.loop = false
     audio.play().catch((err) => console.warn('Bubble pop playback failed:', err))
   } catch (err) {

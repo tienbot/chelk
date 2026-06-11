@@ -73,7 +73,20 @@ const controlsPanel = document.getElementById('controlsPanel')
 const messagePanel = document.getElementById('messagePanel')
 const mixWrapper = document.getElementById('mixWrapper')
 const mixBtn = document.getElementById('mixBtn')
+const btnPlayAgain = document.getElementById('btnPlayAgain')
+const btnRequest = document.getElementById('btnRequest')
 const rangeInputs = Array.from(document.querySelectorAll('.range-input'))
+
+if (btnPlayAgain) {
+  btnPlayAgain.addEventListener('click', () => {
+    resetAppState()
+  })
+}
+if (btnRequest) {
+  btnRequest.addEventListener('click', () => {
+    playCheklSound()
+  })
+}
 
 function playCheklSound() {
   try {
@@ -90,6 +103,14 @@ function updatePlatformLiquid(scoreValue) {
   const percent = Math.round((level / MAX_LIQUID_LEVEL) * 100)
   if (platformDevice) platformDevice.style.setProperty('--progress', percent + '%')
   updatePointsDisplay(scoreValue)
+}
+
+function clearBubblePointerCursor() {
+  const bubbles = Array.from(bubblesContainer.querySelectorAll('.bubble, .bubble2'))
+  for (const bubble of bubbles) {
+    bubble.style.cursor = 'default'
+    bubble.style.setProperty('cursor', 'default', 'important')
+  }
 }
 
 function updatePointsDisplay(scoreValue) {
@@ -300,6 +321,50 @@ function getLottiePathForColor(color) {
   return './other/green.json'
 }
 
+function preloadAudioFiles() {
+  const audioUrls = ['audio/chelk.mp3', 'audio/music2.mp3'];
+  return Promise.all(
+    audioUrls.map((url) =>
+      fetch(url, { cache: 'force-cache' })
+        .then((response) => {
+          if (!response.ok) throw new Error(`Failed to preload audio: ${url}`);
+          return response.arrayBuffer();
+        })
+        .catch((error) => {
+          console.warn('Audio preload failed:', url, error);
+        }),
+    ),
+  );
+}
+
+function preloadLottieResources() {
+  const lottieSources = ['./other/red.json', './other/purple.json', './other/green.json'];
+  const jsonPreload = Promise.all(
+    lottieSources.map((url) =>
+      fetch(url, { cache: 'force-cache' })
+        .then((response) => {
+          if (!response.ok) throw new Error(`Failed to preload Lottie JSON: ${url}`);
+          return response.json();
+        })
+        .catch((error) => {
+          console.warn('Lottie JSON preload failed:', url, error);
+        }),
+    ),
+  );
+  return loadLottieLib().then(() => jsonPreload);
+}
+
+function preloadStartupResources() {
+  const tasks = [preloadAudioFiles(), preloadLottieResources()];
+  if (typeof window !== 'undefined' && window.preloader && typeof window.preloader.addWaitTask === 'function') {
+    tasks.forEach((task) => window.preloader.addWaitTask(task));
+  }
+}
+
+if (typeof window !== 'undefined') {
+  preloadStartupResources();
+}
+
 function clearLottieScrollListener() {
   const scrollArea = document.getElementById('lottieScrollArea')
   if (scrollArea && lottieScrollHandler) {
@@ -344,8 +409,14 @@ function playLottieAnimation(path) {
 
         const section = document.getElementById('lottieSection')
         if (section) {
-          const sectionThreshold = Math.min(1, 163 / Math.max(totalFrames - 1, 1))
-          const sectionProgress = sectionThreshold < 1 ? Math.max(0, Math.min((progress - sectionThreshold) / (1 - sectionThreshold), 1)) : 0
+          const startThreshold = 0.92
+          let sectionProgress = 0
+          if (progress > startThreshold) {
+            sectionProgress = Math.max(0, Math.min((progress - startThreshold) / (1 - startThreshold), 1))
+          }
+          if (maxScroll > 0 && scrollArea.scrollTop >= maxScroll - 1) {
+            sectionProgress = 1
+          }
           section.style.transform = `translateX(${100 - sectionProgress * 100}%)`
           // section.style.opacity = sectionProgress;
           // section.style.visibility = sectionProgress > 0 ? 'visible' : 'hidden';
@@ -442,7 +513,7 @@ function startMixAnimation() {
     })
     const centralBottle = getBottleByIndex(2)
     if (centralBottle) {
-      centralBottle.style.position = 'relative'
+      // centralBottle.style.position = 'relative'
       centralBottle.style.left = 'auto'
       centralBottle.style.top = 'auto'
       centralBottle.style.opacity = '1'
@@ -581,6 +652,7 @@ function spawnDrop(forceColor = false) {
   bubble.style.left = computeLeftForColumn(col) + 'px'
   bubble.dataset.col = String(col)
   bubble.style.top = `-${BUBBLE_SIZE}px`
+  bubble.style.cursor = 'default'
 
   const colorOptions = forceColor || !initialColoredSpawned ? [selectedColorVariant] : gameColors
   const color = colorOptions[Math.floor(Math.random() * colorOptions.length)]
@@ -658,6 +730,7 @@ const gameText = document.querySelector('.game-text')
 
 function startGame() {
   if (gameActive || !allowStart) return
+  clearBubblePointerCursor()
   score = 0
   if (scoreEl) scoreEl.textContent = score
   updatePlatformLiquid(score)
@@ -687,6 +760,7 @@ function startSpawning() {
 function showPlatformRow() {
   if (platformRowShown) return
   playCheklSound()
+  clearBubblePointerCursor()
   platformRowShown = true
 
   const baseLeft = platform.offsetLeft
@@ -788,23 +862,141 @@ function resetGame(preservePosition = false) {
   updatePlatformLiquid(score)
   if (glassText) glassText.classList.remove('fade-out')
   if (gameText) gameText.classList.remove('fade-out')
-  platform.classList.remove('end-vertical')
+  platform.classList.remove('end-vertical', 'merged-central')
   platform.style.transform = ''
-
-  if (!preservePosition) {
-    platform.style.left = initialX + 'px'
-    platform.style.bottom = '-50px'
-    platform.style.top = ''
+  platform.style.position = ''
+  platform.style.left = preservePosition ? platform.style.left : initialX + 'px'
+  platform.style.bottom = preservePosition ? platform.style.bottom : '-50px'
+  platform.style.top = preservePosition ? platform.style.top : ''
+  platform.style.margin = ''
+  platform.style.zIndex = ''
+  platform.style.width = ''
+  platform.style.opacity = ''
+  platform.style.transition = ''
+  platform.style.cursor = ''
+  const rotator = platform.querySelector('.device-rotator')
+  if (rotator) rotator.style.cursor = ''
+  const thermostat = platform.querySelector('.thermostat')
+  if (thermostat) {
+    thermostat.style.transition = ''
+    thermostat.style.transform = ''
   }
+  platform.removeAttribute('data-index')
+  platform.removeAttribute('data-state')
 
-  const all = Array.from(bubblesContainer.querySelectorAll('.bubble2'))
+  const clones = Array.from(bubblesContainer.querySelectorAll('.platform-copy'))
+  for (const clone of clones) if (clone.parentNode) clone.parentNode.removeChild(clone)
+
+  const all = Array.from(bubblesContainer.querySelectorAll('.bubble, .bubble2'))
   for (const b of all) if (b.parentNode) b.parentNode.removeChild(b)
   columnsOccupied = new Array(columnsCount).fill(false)
   initialColoredSpawned = false
-  if (pointsWrapper) pointsWrapper.classList.remove('expanded')
-  if (pointsCounter) pointsCounter.classList.remove('show')
-  if (controlsPanel) controlsPanel.classList.remove('show')
-  if (mixWrapper) mixWrapper.classList.remove('show')
+  if (pointsWrapper) pointsWrapper.classList.remove('expanded', 'fade-out-ui')
+  if (pointsCounter) pointsCounter.classList.remove('show', 'fade-out-ui')
+  if (controlsPanel) controlsPanel.classList.remove('show', 'fade-out-ui')
+  if (mixWrapper) mixWrapper.classList.remove('show', 'fade-out-ui')
+  if (messagePanel) messagePanel.classList.remove('show', 'fade-out-ui')
+}
+
+function resetAppState() {
+  playCheklSound()
+  resetGame(false)
+  mixedDone = false
+  isMerging = false
+  selectedColorVariant = getSelectedColorVariant()
+  gameColors[1] = selectedColorVariant
+  loadPatternSvg(selectedColorVariant)
+  applyPlatformColor(platform, selectedColorVariant)
+  updatePlatformLiquid(0)
+  updateRangeLinePositions()
+  updateMixButtonVisibility()
+  updatePointsDisplay(0)
+
+  const overlay = document.getElementById('lottieOverlay')
+  const scrollArea = document.getElementById('lottieScrollArea')
+  const lottieContainerEl = document.getElementById('lottieContainer')
+  const lottieSectionEl = document.getElementById('lottieSection')
+  if (overlay) overlay.classList.remove('show')
+  if (scrollArea) {
+    scrollArea.scrollTop = 0
+    scrollArea.style.overflowY = 'auto'
+  }
+  if (lottieContainerEl) lottieContainerEl.innerHTML = ''
+  if (lottieSectionEl) lottieSectionEl.style.transform = 'translateX(100%)'
+  clearLottieScrollListener()
+  if (lottieAnimation) {
+    lottieAnimation.destroy()
+    lottieAnimation = null
+  }
+
+  const loadingSection = document.querySelector('section.loading')
+  const soundOverlay = document.getElementById('soundOverlay')
+  const soundBtn = document.getElementById('soundBtn')
+  const soundDescr = document.getElementById('soundDescr')
+  const mainSection = document.getElementById('main-section')
+  const header = document.getElementById('header')
+  const carousel = document.getElementById('carousel')
+
+  if (loadingSection) {
+    loadingSection.classList.remove('hide')
+    loadingSection.style.display = ''
+    loadingSection.style.opacity = ''
+    const tens = document.getElementById('tens')
+    const units = document.getElementById('units')
+    if (tens) tens.textContent = '0'
+    if (units) units.textContent = '0'
+  }
+  if (soundOverlay) {
+    soundOverlay.style.display = 'none'
+  }
+  if (soundBtn) {
+    soundBtn.disabled = false
+    soundBtn.classList.remove('disabled')
+    soundBtn.classList.remove('visible')
+  }
+  if (soundDescr) {
+    soundDescr.classList.remove('visible')
+  }
+  if (mainSection) {
+    mainSection.classList.remove('visible')
+    mainSection.style.opacity = '0'
+    mainSection.querySelectorAll('.carousel, .text-overlay, .controls-wrapper').forEach((el) => {
+      el.classList.remove('visible', 'show-after-sound', 'fade-out')
+      el.classList.add('hidden-on-start')
+      el.style.opacity = '0'
+    })
+  }
+  if (header) {
+    header.classList.remove('visible', 'fade-out')
+    header.style.opacity = '0'
+  }
+  if (carousel) {
+    carousel.classList.remove('visible', 'fade-out')
+    carousel.style.opacity = '0'
+  }
+
+  if (typeof window !== 'undefined') {
+    window.bubbleClick = false
+    window.bubblesActive = false
+    if (window.bgAudio) {
+      try {
+        window.bgAudio.pause()
+        window.bgAudio.currentTime = 0
+      } catch (e) {}
+    }
+    if (typeof window.resetHeadScrollFade === 'function') {
+      window.resetHeadScrollFade()
+    }
+    if (typeof window.runPreloader === 'function') {
+      window.runPreloader({ onComplete: () => {} })
+    } else {
+      import('./js/preloader.js')
+        .then(({ runPreloader }) => {
+          runPreloader({ onComplete: () => {} })
+        })
+        .catch(() => {})
+    }
+  }
 }
 
 // platform and collision logic
@@ -820,21 +1012,27 @@ initialX = Math.max(minX, Math.min(maxX, initialX))
 platform.style.left = initialX + 'px'
 
 platform.addEventListener('click', (event) => {
-  if (!allowStart && !platformRowShown) {
+  if (platformRowShown) {
+    return
+  }
+
+  if (!allowStart) {
     event.stopPropagation()
     playCheklSound()
     showPlatformRow()
-  } else {
-    playCheklSound()
-    startGame()
+    return
   }
+
+  playCheklSound()
+  startGame()
 })
 
 const deviceRotator = platform.querySelector('.device-rotator')
 if (deviceRotator) {
-  deviceRotator.addEventListener('click', () => {
+  deviceRotator.addEventListener('click', (event) => {
     if (!platformRowShown) return
-    playCheklSound()
+    // allow the row click handler to process bottle state changes
+    // and play sound only once from the container click listener.
   })
 }
 
@@ -999,6 +1197,6 @@ function endGame(preservePosition = false) {
   }
 
   // remove remaining bubbles
-  const all = Array.from(bubblesContainer.querySelectorAll('.bubble2'))
+  const all = Array.from(bubblesContainer.querySelectorAll('.bubble, .bubble2'))
   for (const b of all) if (b.parentNode) b.parentNode.removeChild(b)
 }

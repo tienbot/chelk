@@ -1,4 +1,6 @@
 // Прелоадер: логика и экспорт функции запуска
+let preloaderHasRun = false;
+
 export function runPreloader({ onComplete }) {
   const loadingSection = document.querySelector('section.loading');
   const tensElement = document.getElementById('tens');
@@ -9,6 +11,7 @@ export function runPreloader({ onComplete }) {
     modelLoaded: false,
     modelProgress: 0,
     modelTotal: 0,
+    waitTasks: [],
   }
   let displayedPercent = 0;
   let targetPercent = 0;
@@ -69,6 +72,22 @@ export function runPreloader({ onComplete }) {
     tryFinishPreloader();
   }
 
+  function addWaitTask(task) {
+    if (!task || typeof task.then !== 'function') return;
+    const tracker = { done: false };
+    preloaderState.waitTasks.push(tracker);
+    Promise.resolve(task)
+      .catch(() => {})
+      .finally(() => {
+        tracker.done = true;
+        tryFinishPreloader();
+      });
+  }
+
+  function areWaitTasksComplete() {
+    return preloaderState.waitTasks.every((tracker) => tracker.done);
+  }
+
   function markWindowLoaded() {
     preloaderState.windowLoaded = true;
     updatePreloaderProgress();
@@ -77,7 +96,7 @@ export function runPreloader({ onComplete }) {
 
   function tryFinishPreloader() {
     if (finished) return;
-    if (preloaderState.windowLoaded && preloaderState.modelLoaded) {
+    if (preloaderState.windowLoaded && preloaderState.modelLoaded && areWaitTasksComplete()) {
       setTimeout(finishPreloader, 300);
     }
   }
@@ -88,6 +107,7 @@ export function runPreloader({ onComplete }) {
     window.preloader.reportModelProgress = reportModelProgress;
     window.preloader.markModelLoaded = markModelLoaded;
     window.preloader.markWindowLoaded = markWindowLoaded;
+    window.preloader.addWaitTask = addWaitTask;
     if (queued.length > 0) {
       window.preloader._queue = [];
       queued.forEach((item) => {
@@ -219,15 +239,20 @@ export function runPreloader({ onComplete }) {
           const mainSection = document.getElementById('main-section');
           if (mainSection) {
 
-            // Build carousel (create .slide elements) after user gesture so canvases get correct size
-            try {
-              import('./script.js').then((script) => {
-                if (script && script.buildCarousel) {
-                  script.buildCarousel();
-                }
-              }).catch((e) => console.warn('Failed to import script for buildCarousel:', e));
-            } catch (e) {
-              console.warn('Error scheduling buildCarousel:', e);
+            // If the carousel is not already prepared, build it now.
+            if (!window.carouselBuildPromise) {
+              try {
+                window.carouselBuildPromise = import('./script.js').then((script) => {
+                  if (script && script.buildCarousel) {
+                    return script.buildCarousel();
+                  }
+                  return Promise.resolve();
+                }).catch((e) => {
+                  console.warn('Failed to import script for buildCarousel:', e);
+                });
+              } catch (e) {
+                console.warn('Error scheduling buildCarousel:', e);
+              }
             }
 
             setTimeout(() => {
@@ -435,6 +460,9 @@ export function runPreloader({ onComplete }) {
 
   if (document.readyState === 'complete') {
     markWindowLoaded();
+    if (preloaderHasRun) {
+      markModelLoaded();
+    }
     startPreloader();
   } else {
     window.addEventListener('load', () => {
@@ -442,4 +470,11 @@ export function runPreloader({ onComplete }) {
       startPreloader();
     });
   }
+  preloaderHasRun = true;
+}
+
+if (typeof window !== 'undefined') {
+  window.runPreloader = window.runPreloader || runPreloader;
+  window.preloader = window.preloader || {};
+  window.preloader.addWaitTask = window.preloader.addWaitTask || addWaitTask;
 }
